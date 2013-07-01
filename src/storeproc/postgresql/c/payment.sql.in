@@ -1,0 +1,11 @@
+/*
+ * This file is released under the terms of the Artistic License.  Please see
+ * the file LICENSE, included in this package, for details.
+ *
+ * Copyright (C) 2003-2008 Mark Wong & Open Source Development Labs, Inc.
+ */
+
+CREATE OR REPLACE FUNCTION payment (INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, TEXT, REAL)
+RETURNS INTEGER AS
+'MODULE_PATHNAME'
+LANGUAGE C STRICT;

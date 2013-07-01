@@ -1,0 +1,14 @@
+/*
+ * This file is released under the terms of the Artistic License.  Please see
+ * the file LICENSE, included in this package, for details.
+ *
+ * Copyright (C) 2003-2008 Mark Wong & Open Source Development Labs, Inc.
+ */
+
+CREATE TYPE status_info
+AS (ol_i_id INTEGER, ol_supply_w_id INTEGER, ol_quantity REAL, ol_amount REAL, ol_delivery_d TIMESTAMP);
+
+CREATE OR REPLACE FUNCTION order_status (INTEGER, INTEGER, INTEGER, TEXT)
+RETURNS SETOF status_info
+AS 'MODULE_PATHNAME'
+LANGUAGE C STRICT;

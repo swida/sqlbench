@@ -1,0 +1,2 @@
+- remove client, only support standalone mode.
+- implement threadpool

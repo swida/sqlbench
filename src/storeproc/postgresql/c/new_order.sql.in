@@ -1,0 +1,19 @@
+/*
+ * This file is released under the terms of the Artistic License.  Please see
+ * the file LICENSE, included in this package, for details.
+ *
+ * Copyright (C) 2003-2008 Mark Wong & Open Source Development Labs, Inc.
+ */
+
+CREATE TYPE new_order_info
+AS (ol_i_id INTEGER, ol_supply_w_id INTEGER, ol_quantity INTEGER);
+
+CREATE OR REPLACE FUNCTION make_new_order_info (INTEGER, INTEGER, INTEGER)
+RETURNS new_order_info
+AS 'MODULE_PATHNAME'
+LANGUAGE C STRICT;
+
+CREATE OR REPLACE FUNCTION new_order (INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, new_order_info, new_order_info, new_order_info, new_order_info, new_order_info, new_order_info, new_order_info, new_order_info, new_order_info, new_order_info, new_order_info, new_order_info, new_order_info, new_order_info, new_order_info)
+RETURNS INTEGER
+AS 'MODULE_PATHNAME'
+LANGUAGE C STRICT;
