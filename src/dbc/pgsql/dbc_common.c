@@ -117,7 +117,6 @@ pgsql_sql_execute(struct db_context_t *_dbc, char * query, struct sql_result_t *
 	struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
 	PGresult *res;
 
-	sql_result->result_set = NULL;
 	if (!dbc->inTransaction)
 	{
 		/* Start a transaction block. */
@@ -138,9 +137,15 @@ pgsql_sql_execute(struct db_context_t *_dbc, char * query, struct sql_result_t *
 		PQclear(res);
 		return ERROR;
 	}
-	
-	sql_result->result_set = res;
-	sql_result->current_row = -1;
+
+	if(sql_result == NULL)
+		PQclear(res);
+	else
+	{
+		sql_result->result_set = res;
+		sql_result->current_row = -1;
+	}
+
 	return OK;
 }
 

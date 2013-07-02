@@ -39,7 +39,7 @@ void dbt2_escape_str(char *orig_str, char *esc_str)
 	      		esc_str[j++] = '\'';
 	    	esc_str[j++] = orig_str[i];
 		}
-	  esc_str[j] = '\0';
+		esc_str[j] = '\0';
 	}
 }
 
@@ -59,8 +59,8 @@ int dbt2_free_values(char ** values, int max_values)
 
 	for (i=0; i<max_values; i++) {
 		if (values[i]) {
-      	free(values[i]);
-      	values[i]= NULL;
+			free(values[i]);
+			values[i]= NULL;
 		}
 	}
 	return 1;

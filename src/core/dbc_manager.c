@@ -153,6 +153,12 @@ dbc_rollback_transaction(struct db_context_t *dbc)
 	return (*(sop->rollback_transaction))(dbc);
 }
 
+/*
+ * if sql_result is NULL mean discard result, dbc driver should
+ * release result alloc'd memory. otherwise released in
+ * dbc_sql_close_cursor()
+ * if execute failed, memory should release in this function.
+ */
 int
 dbc_sql_execute(struct db_context_t *dbc, char * query, struct sql_result_t * sql_result,
                        char * query_name)
