@@ -21,43 +21,33 @@
 #include <sys/stat.h>
 #include <errno.h>
 
-#define CUSTOMER_DATA "customer.data"
-#define DISTRICT_DATA "district.data"
-#define HISTORY_DATA "history.data"
-#define ITEM_DATA "item.data"
-#define NEW_ORDER_DATA "new_order.data"
-#define ORDER_DATA "order.data"
-#define ORDER_LINE_DATA "order_line.data"
-#define STOCK_DATA "stock.data"
-#define WAREHOUSE_DATA "warehouse.data"
+#include <pthread.h>
 
+#define DATAFILE_EXT ".data"
 #define ENV_SQL_CLIENT_NAME "SQL_CLIENT_PROGRAM"
 #define DEFAULT_SQL_CLIENT "psql"
 
 #define MODE_FLAT 0
 #define MODE_DIRECT 1
 
-/*
- * open load data target stream
- * target file in flat mode
- * target table in direct mode
- */
-FILE *open_output_stream(char *target_name);
+FILE *open_output_stream(int worker_id, char *table_name);
 
-void gen_customers(int warehouses, int from, int to);
-void gen_districts(int warehouses, int from, int to);
-void gen_history(int warehouses, int from, int to);
+void gen_customers(int worker_id, int start, int end);
+void gen_districts(int worker_id, int start, int end);
+void gen_history(int worker_id, int start, int end);
 void gen_items();
-void gen_new_order(int warehouses, int from, int to);
-void gen_orders(int warehouses, int from, int to);
-void gen_stock(int warehouses, int from, int to);
-void gen_warehouses(int warehouses, int from, int to);
+void gen_new_order(int worker_id, int start, int end);
+void gen_orders(int worker_id, int start, int end);
+void gen_stock(int worker_id, int start, int end);
+void gen_warehouses(int worker_id, int start, int end);
 
 int warehouses = 0;
 int customers = CUSTOMER_CARDINALITY;
 int items = ITEM_CARDINALITY;
 int orders = ORDER_CARDINALITY;
 int new_orders = NEW_ORDER_CARDINALITY;
+
+int jobs = 1;
 
 int mode_load = MODE_FLAT;
 
@@ -103,7 +93,7 @@ void print_timestamp(FILE *ofile, struct tm *date)
 				date->tm_hour, date->tm_min, date->tm_sec));
 }
 
-FILE *open_output_stream(char *target_name)
+FILE *open_output_stream(int worker_id, char *table_name)
 {
 	FILE *output;
 	char filename[1024] = "\0";
@@ -113,10 +103,10 @@ FILE *open_output_stream(char *target_name)
 			strcpy(filename, output_path);
 			strcat(filename, "/");
 		}
-		strcat(filename, target_name);
+		sprintf(filename, "%s%s%d%s", filename, table_name, worker_id, DATAFILE_EXT);
 		output = fopen(filename, "w");
 		if (output == NULL) {
-			printf("cannot open %s\n", target_name);
+			printf("cannot open %s\n", table_name);
 			return NULL;
 		}
 	} else if (mode_load == MODE_DIRECT) {
@@ -134,7 +124,7 @@ FILE *open_output_stream(char *target_name)
 
 		fprintf(output,
 				"COPY %s FROM STDIN DELIMITER '%c' NULL '%s';\n",
-				target_name, delimiter, null_str);
+				table_name, delimiter, null_str);
 		/* FIXME: Handle properly instead of blindly reading the output. */
 		while (fgetc(output) != EOF) ;
 	}
@@ -159,7 +149,7 @@ void close_output_stream(FILE *output)
 }
 
 /* Clause 4.3.3.1 */
-void gen_customers(int warehouses, int from, int to)
+void gen_customers(int worker_id, int start, int end)
 {
 	FILE *output;
 	int i, j, k;
@@ -170,11 +160,11 @@ void gen_customers(int warehouses, int from, int to)
 	srand(0);
 	printf("Generating customer table data...\n");
 
-	output = open_output_stream(mode_load == MODE_FLAT ? CUSTOMER_DATA : "customer");
+	output = open_output_stream(worker_id, "customer");
 	if(output == NULL)
 		return;
 
-	for (i = 0; i < warehouses; i++) {
+	for (i = start; i <= end; i++) {
 		for (j = 0; j < DISTRICT_CARDINALITY; j++) {
 			for (k = 0; k < customers; k++) {
 				/* c_id */
@@ -186,7 +176,7 @@ void gen_customers(int warehouses, int from, int to)
 				METAPRINTF((output, "%c", delimiter));
 
 				/* c_w_id */
-				FPRINTF(output, "%d", i + 1);
+				FPRINTF(output, "%d", i);
 				METAPRINTF((output, "%c", delimiter));
 
 				/* c_first */
@@ -302,7 +292,7 @@ void gen_customers(int warehouses, int from, int to)
 }
 
 /* Clause 4.3.3.1 */
-void gen_districts(int warehouses, int from, int to)
+void gen_districts(int worker_id, int start, int end)
 {
 	FILE *output;
 	int i, j;
@@ -312,18 +302,18 @@ void gen_districts(int warehouses, int from, int to)
 	srand(0);
 	printf("Generating district table data...\n");
 
-	output = open_output_stream(mode_load == MODE_FLAT ? DISTRICT_DATA : "district");
+	output = open_output_stream(worker_id, "district");
 	if(output == NULL)
 		return;
 
-	for (i = 0; i < warehouses; i++) {
+	for (i = start; i <= end; i++) {
 		for (j = 0; j < DISTRICT_CARDINALITY; j++) {
 			/* d_id */
 			FPRINTF(output, "%d", j + 1);
 			METAPRINTF((output, "%c", delimiter));
 
 			/* d_w_id */
-			FPRINTF(output, "%d", i + 1);
+			FPRINTF(output, "%d", i);
 			METAPRINTF((output, "%c", delimiter));
 
 			/* d_name */
@@ -382,7 +372,7 @@ void gen_districts(int warehouses, int from, int to)
 }
 
 /* Clause 4.3.3.1 */
-void gen_history(int warehouses, int from, int to)
+void gen_history(int worker_id, int start, int end)
 {
 	FILE *output;
 	int i, j, k;
@@ -394,11 +384,11 @@ void gen_history(int warehouses, int from, int to)
 	srand(0);
 	printf("Generating history table data...\n");
 
-	output = open_output_stream(mode_load == MODE_FLAT ? HISTORY_DATA : "history");
+	output = open_output_stream(worker_id, "history");
 	if(output == NULL)
 		return;
 
-	for (i = 0; i < warehouses; i++) {
+	for (i = start; i <= end; i++) {
 		for (j = 0; j < DISTRICT_CARDINALITY; j++) {
 			for (k = 0; k < customers; k++) {
 				/* h_c_id */
@@ -410,7 +400,7 @@ void gen_history(int warehouses, int from, int to)
 				METAPRINTF((output, "%c", delimiter));
 
 				/* h_c_w_id */
-				FPRINTF(output, "%d", i + 1);
+				FPRINTF(output, "%d", i);
 				METAPRINTF((output, "%c", delimiter));
 
 				/* h_d_id */
@@ -418,7 +408,7 @@ void gen_history(int warehouses, int from, int to)
 				METAPRINTF((output, "%c", delimiter));
 
 				/* h_w_id */
-				FPRINTF(output, "%d", i + 1);
+				FPRINTF(output, "%d", i);
 				METAPRINTF((output, "%c", delimiter));
 
 				/* h_date */
@@ -464,7 +454,7 @@ void gen_items()
 	srand(0);
 	printf("Generating item table data...\n");
 
-	output = open_output_stream(mode_load == MODE_FLAT ? ITEM_DATA : "item");
+	output = open_output_stream(0, "item");
 	if(output == NULL)
 		return;
 
@@ -506,7 +496,7 @@ void gen_items()
 }
 
 /* Clause 4.3.3.1 */
-void gen_new_orders(int warehouses, int from, int to)
+void gen_new_orders(int worker_id, int start, int end)
 {
 	FILE *output;
 	int i, j, k;
@@ -515,11 +505,11 @@ void gen_new_orders(int warehouses, int from, int to)
 	srand(0);
 	printf("Generating new-order table data...\n");
 
-	output = open_output_stream(mode_load == MODE_FLAT ? NEW_ORDER_DATA : "new_order");
+	output = open_output_stream(worker_id, "new_order");
 	if(output == NULL)
 		return;
 
-	for (i = 0; i < warehouses; i++) {
+	for (i = start; i <= end; i++) {
 		for (j = 0; j < DISTRICT_CARDINALITY; j++) {
 			for (k = orders - new_orders; k < orders; k++) {
 				/* no_o_id */
@@ -531,7 +521,7 @@ void gen_new_orders(int warehouses, int from, int to)
 				METAPRINTF((output, "%c", delimiter));
 
 				/* no_w_id */
-				FPRINTF(output, "%d", i + 1);
+				FPRINTF(output, "%d", i);
 
 				METAPRINTF((output, "\n"));
 			}
@@ -545,7 +535,7 @@ void gen_new_orders(int warehouses, int from, int to)
 }
 
 /* Clause 4.3.3.1 */
-void gen_orders(int warehouses, int from, int to)
+void gen_orders(int worker_id, int start, int end)
 {
 	FILE *order, *order_line;
 	int i, j, k, l;
@@ -569,14 +559,14 @@ void gen_orders(int warehouses, int from, int to)
 	srand(0);
 	printf("Generating order and order-line table data...\n");
 
-	order = open_output_stream(mode_load == MODE_FLAT ? ORDER_DATA : "orders");
+	order = open_output_stream(worker_id, "orders");
 	if(order == NULL)
 		return;
-	order_line = open_output_stream(mode_load == MODE_FLAT ? ORDER_LINE_DATA : "order_line");
+	order_line = open_output_stream(worker_id, "order_line");
 	if(order_line == NULL)
 		return;
 
-	for (i = 0; i < warehouses; i++) {
+	for (i = start; i <= end; i++) {
 		for (j = 0; j < DISTRICT_CARDINALITY; j++) {
 			/*
 			 * Create a random list of numbers from 1 to customers for o_c_id.
@@ -624,7 +614,7 @@ void gen_orders(int warehouses, int from, int to)
 				METAPRINTF((order, "%c", delimiter));
 
 				/* o_w_id */
-				FPRINTF(order, "%d", i + 1);
+				FPRINTF(order, "%d", i);
 				METAPRINTF((order, "%c", delimiter));
 
 				/* o_c_id */
@@ -674,7 +664,7 @@ void gen_orders(int warehouses, int from, int to)
 					METAPRINTF((order_line, "%c", delimiter));
 
 					/* ol_w_id */
-					FPRINTF(order_line, "%d", i + 1);
+					FPRINTF(order_line, "%d", i);
 					METAPRINTF((order_line, "%c", delimiter));
 
 					/* ol_number */
@@ -687,7 +677,7 @@ void gen_orders(int warehouses, int from, int to)
 					METAPRINTF((order_line, "%c", delimiter));
 
 					/* ol_supply_w_id */
-					FPRINTF(order_line, "%d", i + 1);
+					FPRINTF(order_line, "%d", i);
 					METAPRINTF((order_line, "%c", delimiter));
 
 					if (k < 2101) {
@@ -741,7 +731,7 @@ void gen_orders(int warehouses, int from, int to)
 }
 
 /* Clause 4.3.3.1 */
-void gen_stock(int warehouses, int from, int to)
+void gen_stock(int worker_id, int start, int end)
 {
 	FILE *output;
 	int i, j, k;
@@ -751,18 +741,18 @@ void gen_stock(int warehouses, int from, int to)
 	srand(0);
 	printf("Generating stock table data...\n");
 
-	output = open_output_stream(mode_load == MODE_FLAT ? STOCK_DATA : "stock");
+	output = open_output_stream(worker_id, "stock");
 	if(output == NULL)
 		return;
 
-	for (i = 0; i < warehouses; i++) {
+	for (i = start; i <= end; i++) {
 		for (j = 0; j < items; j++) {
 			/* s_i_id */
 			FPRINTF(output, "%d", j + 1);
 			METAPRINTF((output, "%c", delimiter));
 
 			/* s_w_id */
-			FPRINTF(output, "%d", i + 1);
+			FPRINTF(output, "%d", i);
 			METAPRINTF((output, "%c", delimiter));
 
 			/* s_quantity */
@@ -851,7 +841,7 @@ void gen_stock(int warehouses, int from, int to)
 }
 
 /* Clause 4.3.3.1 */
-void gen_warehouses(int warehouses, int from, int to)
+void gen_warehouses(int worker_id, int start, int end)
 {
 	FILE *output;
 	int i;
@@ -861,13 +851,13 @@ void gen_warehouses(int warehouses, int from, int to)
 	srand(0);
 	printf("Generating warehouse table data...\n");
 
-	output = open_output_stream(mode_load == MODE_FLAT ? WAREHOUSE_DATA : "warehouse");
+	output = open_output_stream(worker_id, "warehouse");
 	if(output == NULL)
 		return;
 
-	for (i = 0; i < warehouses; i++) {
+	for (i = start; i <= end; i++) {
 		/* w_id */
-		FPRINTF(output, "%d", i + 1);
+		FPRINTF(output, "%d", i);
 		METAPRINTF((output, "%c", delimiter));
 
 		/* w_name */
@@ -920,17 +910,45 @@ void gen_warehouses(int warehouses, int from, int to)
 	return;
 }
 
+struct datagen_context_t
+{
+	int worker_id;
+	int start_warehouse;
+	int end_warehouse;
+	int gen_items;				/* 1, this worker will gen items data also*/
+};
+
+void *datagen_worker(void *data)
+{
+	struct datagen_context_t *dc;
+	dc = (struct datagen_context_t *) data;
+	if(dc->gen_items == 1)
+		gen_items();
+	gen_warehouses(dc->worker_id, dc->start_warehouse, dc->end_warehouse);
+	gen_stock(dc->worker_id, dc->start_warehouse, dc->end_warehouse);
+	gen_districts(dc->worker_id, dc->start_warehouse, dc->end_warehouse);
+	gen_customers(dc->worker_id, dc->start_warehouse, dc->end_warehouse);
+	gen_history(dc->worker_id, dc->start_warehouse, dc->end_warehouse);
+	gen_orders(dc->worker_id, dc->start_warehouse, dc->end_warehouse);
+	gen_new_orders(dc->worker_id, dc->start_warehouse, dc->end_warehouse);
+	return NULL;
+}
+
 int main(int argc, char *argv[])
 {
 	struct stat st;
 
 	/* For getoptlong(). */
 	int c;
+	pthread_t *tid;
+	struct datagen_context_t *datagen_context;
+	int j;
+	int chunk, rem, curr_end;
 
 	init_common();
 
 	if (argc < 2) {
-		printf("Usage: %s -w # [-c #] [-i #] [-o #] [-s #] [-n #] [-d <str>]\n",
+		printf("Usage: %s -w # [-c #] [-i #] [-o #] [-s #] [-n #] [-j #] [-d <str>]\n",
 				argv[0]);
 		printf("\n");
 		printf("-w #\n");
@@ -943,6 +961,8 @@ int main(int argc, char *argv[])
 		printf("\torder cardinality, default %d\n", ORDER_CARDINALITY);
 		printf("-n #\n");
 		printf("\tnew-order cardinality, default %d\n", NEW_ORDER_CARDINALITY);
+		printf("-j #\n");
+		printf("\tNumber of worker threads within datagen, default is %d\n", jobs);
 		printf("-d <path>\n");
 		printf("\toutput path of data files\n");
 		printf("--direct\n");
@@ -958,7 +978,7 @@ int main(int argc, char *argv[])
 			{ 0, 0, 0, 0 }
 		};
 
-		c = getopt_long(argc, argv, "c:d:i:n:o:w:",
+		c = getopt_long(argc, argv, "c:d:i:n:j:o:w:",
 				long_options, &option_index);
 		if (c == -1) {
 			break;
@@ -975,6 +995,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'i':
 			items = atoi(optarg);
+			break;
+		case 'j':
+			jobs = atoi(optarg);
 			break;
 		case 'n':
 			new_orders = atoi(optarg);
@@ -995,6 +1018,9 @@ int main(int argc, char *argv[])
 		printf("-w must be used\n");
 		return 3;
 	}
+
+	if (jobs > warehouses)
+		jobs = warehouses;
 
 	if (strlen(output_path) > 0 && ((stat(output_path, &st) < 0) ||
 			(st.st_mode & S_IFMT) != S_IFDIR)) {
@@ -1021,7 +1047,7 @@ int main(int argc, char *argv[])
 	printf("stock = %d\n", items);
 	printf("new_orders = %d\n", new_orders);
 	printf("\n");
-
+	printf("load threads: %d\n", jobs);
 	if (strlen(output_path) > 0) {
 		printf("Output directory of data files: %s\n",output_path);
 	} else {
@@ -1029,14 +1055,38 @@ int main(int argc, char *argv[])
 	}
 	printf("\n");
 	printf("Generating data files for %d warehouse(s)...\n", warehouses);
-	gen_items();
-	gen_warehouses(warehouses, 1, warehouses);
-	gen_stock(warehouses, 1, warehouses);
-	gen_districts(warehouses, 1, warehouses);
-	gen_customers(warehouses, 1, warehouses);
-	gen_history(warehouses, 1, warehouses);
-	gen_orders(warehouses, 1, warehouses);
-	gen_new_orders(warehouses, 1, warehouses);
 
+	tid = (pthread_t *)malloc(sizeof(pthread_t) * jobs);
+	datagen_context = (struct datagen_context_t *)malloc(sizeof(struct datagen_context_t) * jobs);
+
+	chunk = warehouses / jobs;
+	rem = warehouses % jobs;
+	curr_end = 1;
+	for(j = 0; j < jobs; j++)
+	{
+		datagen_context[j].worker_id = j;
+		datagen_context[j].start_warehouse = curr_end;
+		if(rem > 0)
+		{
+			curr_end += chunk + 1;
+			rem --;
+		}
+		else
+			curr_end += chunk;
+		datagen_context[j].end_warehouse = curr_end - 1;
+		if (j == 0)
+			datagen_context[j].gen_items = 1;
+		else
+			datagen_context[j].gen_items = 0;
+
+		pthread_create(&tid[j], NULL, &datagen_worker, &datagen_context[j]);
+	}
+
+	/* wait all threads finished */
+	for(j = 0; j < jobs; j++)
+		pthread_join(tid[j], NULL);
+
+	free(tid);
+	free(datagen_context);
 	return 0;
 }
