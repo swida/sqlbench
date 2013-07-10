@@ -154,6 +154,13 @@ union transaction_data_t
 	struct integrity_t integrity;	
 };
 
+struct client_transaction_t
+{
+	int status;
+	int transaction;
+	union transaction_data_t transaction_data;
+};
+
 int dump(FILE *fp, int type, void *data);
 
 #endif /* _TRANSACTION_DATA_H_ */

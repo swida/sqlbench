@@ -17,6 +17,8 @@
 #include <common.h>
 #include <transaction_data.h>
 
+static __thread unsigned int seed = 0;
+
 char output_path[256] = "";
 char a_string_char[A_STRING_CHAR_LEN];
 const char *n_string_char = "0123456789";
@@ -128,12 +130,17 @@ int get_nurand(int a, int x, int y)
 /* Return a number from 0 to max. */
 double get_percentage()
 {
-	return (double) rand() / (double) RAND_MAX;
+	return (double) rand_r(&seed) / (double) RAND_MAX;
+}
+
+void set_random_seed(unsigned int s)
+{
+     seed = s;
 }
 
 int get_random(int max)
 {
-	return rand() % max;
+	return rand_r(&seed) % max;
 }
 
 /*
@@ -153,7 +160,7 @@ int init_common()
 {
 	int i, j;
 
-	srand(1);
+	set_random_seed(1);
 
 	/* Initialize struct to have default table cardinalities. */
 	table_cardinality.warehouses = 1;

@@ -24,13 +24,10 @@
 #include "common.h"
 #include "logging.h"
 #include "driver.h"
-#include "client_interface.h"
 #include "input_data_generator.h"
-#ifdef STANDALONE
 #include "db.h"
 #include "transaction_queue.h"
 #include "db_threadpool.h"
-#endif /* STANDALONE */
 
 #define MIX_LOG_NAME "mix.log"
 
@@ -42,7 +39,6 @@ struct transaction_mix_t transaction_mix;
 struct key_time_t key_time;
 struct think_time_t think_time;
 char hostname[32];
-int client_port = CLIENT_PORT;
 int duration = 0;
 int stop_time = 0;
 int w_id_min = 0, w_id_max = 0;
@@ -79,7 +75,7 @@ int create_pid_file()
 	FILE * fpid;
 	char pid_filename[1024];
 
-	sprintf(pid_filename, "%s/%s", output_path, DRIVER_PID_FILENAME);
+	sprintf(pid_filename, "%s%s", output_path, DRIVER_PID_FILENAME);
 
 	fpid = fopen(pid_filename,"w");
 	if (!fpid) {
@@ -133,23 +129,27 @@ int init_driver_logging()
 
 int integrity_terminal_worker()
 {
-	int length;
-	int sockfd;
+	int rc;
+	struct client_transaction_t *client_data;
 
-	struct client_transaction_t client_data;
-	extern int errno;
+	struct transaction_queue_node_t *node =
+			(struct transaction_queue_node_t *)
+			malloc(sizeof(struct transaction_queue_node_t));
 
-	/* Connect to the client program. */
-	sockfd = connect_to_client(hostname, client_port);
-	if (sockfd < 1) {
-		LOG_ERROR_MESSAGE("connect_to_client() failed, thread exiting...");
-		printf("connect_to_client() failed, thread exiting...\n");
-		pthread_exit(NULL);
+	if (sem_init(&node->s, 0, 0) != 0)
+	{
+		LOG_ERROR_MESSAGE("cannot init tran_status");
+		return ERROR;
 	}
 
-	client_data.transaction = INTEGRITY;
-	generate_input_data(client_data.transaction,
-			&client_data.transaction_data, table_cardinality.warehouses);
+	client_data = &node->client_data;
+	client_data->transaction = INTEGRITY;
+
+	generate_input_data(client_data->transaction,
+			&client_data->transaction_data, table_cardinality.warehouses);
+
+	enqueue_transaction(node);
+	sem_wait(&node->s);
 
 #ifdef DEBUG
 	printf("executing transaction %c\n"
@@ -159,12 +159,9 @@ int integrity_terminal_worker()
 	LOG_ERROR_MESSAGE("executing transaction %c",
 			transaction_short_name[client_data.transaction]);
 #endif /* DEBUG */
-
-	length = send_transaction_data(sockfd, &client_data);
-	length = receive_transaction_data(sockfd, &client_data);
-	close(sockfd);
-
-	return client_data.status;
+	sem_destroy(&node->s);
+	free(node);
+	return rc;
 }
 
 int recalculate_mix()
@@ -212,14 +209,6 @@ int set_client_hostname(char *addr)
 {
 	strcpy(hostname, addr);
 	printf("connecting to client at '%s'\n", hostname);
-	fflush(stdout);
-	return OK;
-}
-
-int set_client_port(int port)
-{
-	client_port = port;
-	printf("connecting to client port at '%d'\n", client_port);
 	fflush(stdout);
 	return OK;
 }
@@ -279,6 +268,19 @@ int set_transaction_mix(int transaction, double mix)
 	return OK;
 }
 
+int start_db_threadpool()
+{
+	printf("opening %d connection(s) to database...\n", db_connections);
+	/* Open database connectiosn. */
+	if (db_threadpool_init() != OK) {
+		LOG_ERROR_MESSAGE("cannot open database connections");
+		return ERROR;
+	}
+	printf("%d DB worker threads have started\n", db_connections);
+	fflush(stdout);
+	return OK;
+}
+
 int start_driver()
 {
 	int i, j;
@@ -289,15 +291,6 @@ int start_driver()
 
 	ts.tv_sec = (time_t) (client_conn_sleep / 1000);
 	ts.tv_nsec = (long) (client_conn_sleep % 1000) * 1000000;
-#ifdef STANDALONE
-	/* Open database connectiosn. */
-/*
-	if (db_threadpool_init() != OK) {
-		LOG_ERROR_MESSAGE("cannot open database connections");
-		return ERROR;
-	}
-*/
-#endif /* STANDALONE */
 
 	/* Caulculate when the test should stop. */
 	threads_start_time = (int) ((double) client_conn_sleep / 1000.0 *
@@ -332,6 +325,7 @@ int start_driver()
 						(i + j + 1) * terminals_per_warehouse);
 				return ERROR;
 			}
+
 			if (pthread_attr_setstacksize(&attr, stacksize) != 0) {
 				LOG_ERROR_MESSAGE("could not set pthread stack size: %d",
 						(i + j + 1) * terminals_per_warehouse);
@@ -414,19 +408,22 @@ int start_driver()
 			break;
 		}
 	}
+
+#if 0
+	do {
+		/* Loop until all the DB worker threads have exited. */
+		sem_getvalue(&db_worker_count, &count);
+		sleep(1);
+	} while (count > 0);
+#endif
 	printf("driver is exiting normally\n");
 	return OK;
 }
 
 void *terminal_worker(void *data)
 {
-#ifndef STANDALONE
-	int length;
-	int sockfd;
-#endif /* NOT STANDALONE */
-
 	struct terminal_context_t *tc;
-	struct client_transaction_t client_data;
+	struct client_transaction_t *client_data;
 	double threshold;
 	int keying_time;
 	struct timespec thinking_time, rem;
@@ -434,24 +431,24 @@ void *terminal_worker(void *data)
 	struct timeval rt0, rt1;
 	double response_time;
 	extern int errno;
-	int rc;
 	int local_seed;
 	pid_t pid;
 	pthread_t tid;
 	char code;
 
-#ifdef STANDALONE
-	struct db_context_t dbc;
 	struct transaction_queue_node_t *node =
 			(struct transaction_queue_node_t *)
 			malloc(sizeof(struct transaction_queue_node_t));
-	extern char sname[32];
-	extern int exiting;
-#ifdef LIBPQ
-	extern char postmaster_port[32];
-#endif /* LIBPQ */
 
-#endif /* STANDALONE */
+	client_data = &node->client_data;
+
+	extern int exiting;
+
+	if (sem_init(&node->s, 0, 0) != 0)
+	{
+		LOG_ERROR_MESSAGE("cannot init tran_status");
+		return NULL;
+	}
 
 	tc = (struct terminal_context_t *) data;
 	/* Each thread needs to seed in Linux. */
@@ -472,26 +469,6 @@ void *terminal_worker(void *data)
 	fflush(stdout);
 	srand(local_seed);
 
-#ifdef STANDALONE
-#ifdef LIBPQ
-	db_init(DB_NAME, sname, postmaster_port);
-#endif /* LIBPQ */
-
-	if (!exiting && connect_to_db(&dbc) != OK) {
-		LOG_ERROR_MESSAGE("db_connect() error, terminating program");
-		printf("cannot connect to database, exiting...\n");
-		exit(1);
-	}
-#else
-	/* Connect to the client program. */
-	sockfd = connect_to_client(hostname, client_port);
-	if (sockfd < 1) {
-		LOG_ERROR_MESSAGE( "connect_to_client() failed, thread exiting...");
-		printf("connect_to_client() failed, thread exiting...\n");
-		pthread_exit(NULL);
-	}
-#endif /* STANDALONE */
-
 	do {
 		if (mode_altered > 0) {
 			/*
@@ -508,119 +485,105 @@ void *terminal_worker(void *data)
 		 */
 		threshold = get_percentage();
 		if (threshold < transaction_mix.new_order_threshold) {
-			client_data.transaction = NEW_ORDER;
+			client_data->transaction = NEW_ORDER;
 			keying_time = key_time.new_order;
 			mean_think_time = think_time.new_order;
 		} else if (transaction_mix.payment_actual != 0 &&
 			threshold < transaction_mix.payment_threshold) {
-			client_data.transaction = PAYMENT;
+			client_data->transaction = PAYMENT;
 			keying_time = key_time.payment;
 			mean_think_time = think_time.payment;
 		} else if (transaction_mix.order_status_actual != 0 &&
 			threshold < transaction_mix.order_status_threshold) {
-			client_data.transaction = ORDER_STATUS;
+			client_data->transaction = ORDER_STATUS;
 			keying_time = key_time.order_status;
 			mean_think_time = think_time.order_status;
 		} else if (transaction_mix.delivery_actual != 0 &&
 			threshold < transaction_mix.delivery_threshold) {
-			client_data.transaction = DELIVERY;
+			client_data->transaction = DELIVERY;
 			keying_time = key_time.delivery;
 			mean_think_time = think_time.delivery;
 		} else {
-			client_data.transaction = STOCK_LEVEL;
+			client_data->transaction = STOCK_LEVEL;
 			keying_time = key_time.stock_level;
 			mean_think_time = think_time.stock_level;
 		}
 
 #ifdef DEBUG
 		printf("executing transaction %c\n",
-			transaction_short_name[client_data.transaction]);
+			transaction_short_name[client_data->transaction]);
 		fflush(stdout);
 		LOG_ERROR_MESSAGE("executing transaction %c",
-			transaction_short_name[client_data.transaction]);
+			transaction_short_name[client_data->transaction]);
 #endif /* DEBUG */
 
 		/* Generate the input data for the transaction. */
-		if (client_data.transaction != STOCK_LEVEL) {
-			generate_input_data(client_data.transaction,
-					&client_data.transaction_data, tc->w_id);
+		if (client_data->transaction != STOCK_LEVEL) {
+			generate_input_data(client_data->transaction,
+					&client_data->transaction_data, tc->w_id);
 		} else {
-			generate_input_data2(client_data.transaction,
-					&client_data.transaction_data, tc->w_id, tc->d_id);
+			generate_input_data2(client_data->transaction,
+					&client_data->transaction_data, tc->w_id, tc->d_id);
 		}
 
 		/* Keying time... */
 		pthread_mutex_lock(
-				&mutex_terminal_state[KEYING][client_data.transaction]);
-		++terminal_state[KEYING][client_data.transaction];
+				&mutex_terminal_state[KEYING][client_data->transaction]);
+		++terminal_state[KEYING][client_data->transaction];
 		pthread_mutex_unlock(
-				&mutex_terminal_state[KEYING][client_data.transaction]);
+				&mutex_terminal_state[KEYING][client_data->transaction]);
 		if (time(NULL) < stop_time) {
 			sleep(keying_time);
 		} else {
 			break;
 		}
 		pthread_mutex_lock(
-				&mutex_terminal_state[KEYING][client_data.transaction]);
-		--terminal_state[KEYING][client_data.transaction];
+				&mutex_terminal_state[KEYING][client_data->transaction]);
+		--terminal_state[KEYING][client_data->transaction];
 		pthread_mutex_unlock(
-				&mutex_terminal_state[KEYING][client_data.transaction]);
+				&mutex_terminal_state[KEYING][client_data->transaction]);
 
 		/* Note this thread is executing a transation. */
 		pthread_mutex_lock(
-				&mutex_terminal_state[EXECUTING][client_data.transaction]);
-		++terminal_state[EXECUTING][client_data.transaction];
+				&mutex_terminal_state[EXECUTING][client_data->transaction]);
+		++terminal_state[EXECUTING][client_data->transaction];
 		pthread_mutex_unlock(
-				&mutex_terminal_state[EXECUTING][client_data.transaction]);
+				&mutex_terminal_state[EXECUTING][client_data->transaction]);
 		/* Execute transaction and record the response time. */
 		if (gettimeofday(&rt0, NULL) == -1) {
 			perror("gettimeofday");
 		}
-#ifdef STANDALONE
-		memcpy(&node->client_data, &client_data, sizeof(client_data));
-/*
+
 		enqueue_transaction(node);
-		node = get_node();
-		if (node == NULL) {
-			LOG_ERROR_MESSAGE("Cannot get a transaction node.\n");
+
+		sem_wait(&node->s);
+
+		if (node->client_data.status == OK) {
+			code = 'C';
+		} else if (node->client_data.status == STATUS_ROLLBACK) {
+			code = 'R';
+		} else if (node->client_data.status == ERROR) {
+			code = 'E';
 		}
-*/
-		rc = process_transaction(node->client_data.transaction, &dbc,
-				&node->client_data.transaction_data);
-		if (rc == ERROR) {
-			LOG_ERROR_MESSAGE("process_transaction() error on %s",
-					transaction_name[node->client_data.transaction]);
-		}
-#else /* STANDALONE */
-		length = send_transaction_data(sockfd, &client_data);
-		length = receive_transaction_data(sockfd, &client_data);
-		rc = client_data.status;
-#endif /* STANDALONE */
+		/* mix log record in db_threadpool */
 		if (gettimeofday(&rt1, NULL) == -1) {
 			perror("gettimeofday");
 		}
 		response_time = difftimeval(rt1, rt0);
 		pthread_mutex_lock(&mutex_mix_log);
-		if (rc == OK) {
-			code = 'C';
-		} else if (rc == STATUS_ROLLBACK) {
-			code = 'R';
-		} else if (rc == ERROR) {
-			code = 'E';
-		}
 		fprintf(log_mix, "%d,%c,%c,%f,%lu\n", (int) time(NULL),
-				transaction_short_name[client_data.transaction], code,
+				transaction_short_name[client_data->transaction], code,
 				response_time, (unsigned long) pthread_self());
 		fflush(log_mix);
 		pthread_mutex_unlock(&mutex_mix_log);
-		pthread_mutex_lock(&mutex_terminal_state[EXECUTING][client_data.transaction]);
-		--terminal_state[EXECUTING][client_data.transaction];
-		pthread_mutex_unlock(&mutex_terminal_state[EXECUTING][client_data.transaction]);
+		pthread_mutex_lock(&mutex_terminal_state[EXECUTING][client_data->transaction]);
+		--terminal_state[EXECUTING][client_data->transaction];
+		pthread_mutex_unlock(&mutex_terminal_state[EXECUTING][client_data->transaction]);
 
 		/* Thinking time... */
-		pthread_mutex_lock(&mutex_terminal_state[THINKING][client_data.transaction]);
-		++terminal_state[THINKING][client_data.transaction];
-		pthread_mutex_unlock(&mutex_terminal_state[THINKING][client_data.transaction]);
+		pthread_mutex_lock(&mutex_terminal_state[THINKING][client_data->transaction]);
+		++terminal_state[THINKING][client_data->transaction];
+		pthread_mutex_unlock(&mutex_terminal_state[THINKING][client_data->transaction]);
 		if (time(NULL) < stop_time) {
 			thinking_time.tv_nsec = (long) get_think_time(mean_think_time);
 			thinking_time.tv_sec = (time_t) (thinking_time.tv_nsec / 1000);
@@ -637,14 +600,19 @@ void *terminal_worker(void *data)
 				}
 			}
 		}
-		pthread_mutex_lock(&mutex_terminal_state[THINKING][client_data.transaction]);
-		--terminal_state[THINKING][client_data.transaction];
-		pthread_mutex_unlock(&mutex_terminal_state[THINKING][client_data.transaction]);
+		pthread_mutex_lock(&mutex_terminal_state[THINKING][client_data->transaction]);
+		--terminal_state[THINKING][client_data->transaction];
+		pthread_mutex_unlock(&mutex_terminal_state[THINKING][client_data->transaction]);
+
+		if (node == NULL) {
+			LOG_ERROR_MESSAGE("Cannot get a transaction node.\n");
+		}
+
 	} while (time(NULL) < stop_time);
 
-#ifdef STANDALONE
-	/*recycle_node(node);*/
-#endif /* STANDALONE */
+	sem_destroy(&node->s);
+	free(node);
+
 	/* Note when each thread has exited. */
 	pthread_mutex_lock(&mutex_mix_log);
 	fprintf(log_mix, "%d,TERMINATED,,,%lu\n", (int) time(NULL), (unsigned long)pthread_self());

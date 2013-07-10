@@ -15,142 +15,140 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <sys/stat.h>
 #include <common.h>
 #include <logging.h>
-#include <client_interface.h>
 #include <driver.h>
 #include <unistd.h>
-#ifdef STANDALONE
 #include <db_threadpool.h>
+#include "dbc.h"
 
-char sname[32] = "";
 int exiting = 0;
-#endif /* STANDALONE */
-
-char postmaster_port[32];
 
 int perform_integrity_check = 0;
+int no_thinktime = 0;
 
 int parse_arguments(int argc, char *argv[]);
 
 int main(int argc, char *argv[])
 {
+	struct stat st;
+
 	/* Initialize various components. */
 	init_common();
+	init_dbc_manager();
 	init_driver();
 
 	if (parse_arguments(argc, argv) != OK) {
-		printf("usage: %s -d <address> -wmin # -wmax # -l # [-w #] [-p #] [-c #] [-i #] [-o #] [-n #] [-q %%] [-r %%] [-e %%] [-t %%] [-seed #] [-altered 0] [-spread #] [-z]",
+		printf("usage: %s -t <dbms> -c # -w # -l # [-s #] [-e #] [-o p] [-z]",
 			argv[0]);
-#ifdef STANDALONE
-		printf(" -z #");
-#endif /* STANDALONE */
-		printf("\n\n");
-#ifdef STANDALONE
-		printf("-dbname <connect_string>\n");
-		printf("\tdatabase connect string\n");
-		printf("-z #\n");
-		printf("\tpostmaster listener port\n");
-#else /* STANDALONE */
-		printf("-d <address>\n");
-		printf("\tnetwork address where client program is running\n");
-		printf("-p #\n");
-		printf("\tclient port, default %d\n", CLIENT_PORT);
-#endif /* STANDALONE */
 		printf("\n");
+		printf("-t <dbms>\n");
+		printf("\tavailable:%s\n", dbc_manager_get_dbcnames());
+		printf("%s", dbc_manager_get_dbcusages());
+		printf("-c #\n");
+		printf("\tnumber of database connections\n");
+		printf("-w #\n");
+		printf("\twarehouse cardinality, default 1\n");
 		printf("-l #\n");
 		printf("\tthe duration of the run in seconds\n");
 		printf("\n");
-		printf("-wmin #\n");
-		printf("\tlower warehouse id\n");
-		printf("-wmax #\n");
-		printf("\tupper warehouse id\n");
-		printf("-w #\n");
-		printf("\twarehouse cardinality, default 1\n");
-		printf("-c #\n");
+		printf("-s #\n");
+		printf("\tlower warehouse id, default 1\n");
+		printf("-e #\n");
+		printf("\tupper warehouse id, default <w>\n");
+		printf("-z\n");
+		printf("\tperform database integrity check\n");
+		printf("--customer #\n");
 		printf("\tcustomer cardinality, default %d\n", CUSTOMER_CARDINALITY);
-		printf("-i #\n");
+		printf("--item #\n");
 		printf("\titem cardinality, default %d\n", ITEM_CARDINALITY);
-		printf("-o #\n");
+		printf("--order #\n");
 		printf("\torder cardinality, default %d\n", ORDER_CARDINALITY);
-		printf("-n #\n");
+		printf("--new-order #\n");
 		printf("\tnew-order cardinality, default %d\n", NEW_ORDER_CARDINALITY);
 		printf("\n");
-		printf("-q %%\n");
+		printf("--mixp %%\n");
 		printf("\tmix percentage of Payment transaction, default %0.2f\n",
 				MIX_PAYMENT);
-		printf("-r %%\n");
+		printf("--mixo %%\n");
 		printf("\tmix percentage of Order-Status transaction, default %0.2f\n",
 				MIX_ORDER_STATUS);
-		printf("-e %%\n");
+		printf("--mixd %%\n");
 		printf("\tmix percentage of Delivery transaction, default %0.2f\n",
 				MIX_DELIVERY);
-		printf("-t %%\n");
+		printf("--mixs %%\n");
 		printf("\tmix percentage of Stock-Level transaction, default %0.2f\n",
 				MIX_STOCK_LEVEL);
 		printf("\n");
-		printf("-ktd #\n");
+		printf("--ktd #\n");
 		printf("\tdelivery keying time, default %d s\n", KEY_TIME_DELIVERY);
-		printf("-ktn #\n");
+		printf("--ktn #\n");
 		printf("\tnew-order keying time, default %d s\n", KEY_TIME_NEW_ORDER);
-		printf("-kto #\n");
+		printf("--kto #\n");
 		printf("\torder-status keying time, default %d s\n",
 				KEY_TIME_ORDER_STATUS);
-		printf("-ktp #\n");
+		printf("--ktp #\n");
 		printf("\tpayment keying time, default %d s\n", KEY_TIME_PAYMENT);
-		printf("-kts #\n");
+		printf("--kts #\n");
 		printf("\tstock-level keying time, default %d s\n",
 				KEY_TIME_STOCK_LEVEL);
-		printf("-ttd #\n");
+		printf("--ttd #\n");
 		printf("\tdelivery thinking time, default %d ms\n",
 				THINK_TIME_DELIVERY);
-		printf("-ttn #\n");
+		printf("--ttn #\n");
 		printf("\tnew-order thinking time, default %d ms\n",
 				THINK_TIME_NEW_ORDER);
-		printf("-tto #\n");
+		printf("--tto #\n");
 		printf("\torder-status thinking time, default %d ms\n",
 				THINK_TIME_ORDER_STATUS);
-		printf("-ttp #\n");
+		printf("--ttp #\n");
 		printf("\tpayment thinking time, default %d ms\n", THINK_TIME_PAYMENT);
-		printf("-tts #\n");
+		printf("--tts #\n");
 		printf("\tstock-level thinking time, default %d ms\n",
 				THINK_TIME_STOCK_LEVEL);
+		printf("--no-thinktime\n");
+		printf("no think time and keying time to every transaction\n");
 		printf("\n");
-		printf("-tpw #\n");
+		printf("--tpw #\n");
 		printf("\tterminals started per warehouse, default 10\n");
 
 		printf("\n");
-		printf("-seed #\n");
+		printf("--seed #\n");
 		printf("\trandom number seed\n");
-		printf("-altered [0/1]\n");
-		printf("\trun with a thread per user, -altered 1\n");
-		printf("-sleep #\n");
+		printf("--altered #\n");
+		printf("\trun with a thread per user, and will start # threads\n");
+		printf("--sleep #\n");
 		printf("\tnumber of milliseconds to sleep between terminal creation\n");
-		printf("-spread #\n");
+		printf("--spread #\n");
 		printf("\tfancy warehouse skipping trick for low i/o runs\n");
-
-		printf("-z #\n");
-		printf("\tperform database integrity check\n");
-#ifdef STANDALONE
-		printf("\nDriver is in STANDALONE mode.\n");
-#endif /* STANDALONE */
-
 		return 1;
 	}
-	create_pid_file();
 
 	if(init_logging() != OK || init_driver_logging() != OK) {
 		printf("cannot init driver\n");
 		return 1;
 	};
 
+	create_pid_file();
+
+	if (db_connections == 0) {
+		printf("-c not used\n");
+		return 1;
+	}
+
+	if(w_id_min == 0)
+		w_id_min = 1;
+	if(w_id_max == 0)
+		w_id_max = table_cardinality.warehouses;
+
 	/* Sanity check on the parameters. */
 	if (w_id_min > w_id_max) {
-		printf("wmin cannot be larger than wmax\n");
+		printf("lower warehouse id cannot be larger than upper warehouse id\n");
 		return 1;
 	}
 	if (w_id_max > table_cardinality.warehouses) {
-		printf("wmax cannot be larger than w\n");
+		printf("upper warehouse id cannot be larger than warehouse cardinality\n");
 		return 1;
 	}
 
@@ -163,6 +161,41 @@ int main(int argc, char *argv[])
 				transaction_mix.new_order_actual);
 		return 1;
 	}
+
+	if(no_thinktime)
+	{
+		key_time.delivery = 0;
+		key_time.new_order = 0;
+		key_time.order_status = 0;
+		key_time.payment = 0;
+		key_time.stock_level = 0;
+
+		think_time.delivery = 0;
+		think_time.new_order = 0;
+		think_time.order_status = 0;
+		think_time.payment = 0;
+		think_time.stock_level = 0;
+	}
+
+	if (strlen(output_path) > 0 && ((stat(output_path, &st) < 0) ||
+			(st.st_mode & S_IFMT) != S_IFDIR)) {
+		printf("Output directory of data files '%s' not exists\n", output_path);
+		return 3;
+	}
+
+	if (strlen(output_path) > 0) {
+		printf("Output directory of log files: %s\n",output_path);
+	} else {
+		printf("Output directory of log files: current directory\n");
+	}
+
+	/* Double database conections. */
+	printf("\n");
+	printf("database connection:\n");
+	printf("connections = %d", db_connections);
+	printf("\n");
+
+	/* TODO: print dbms type, database host, database port */
 
 	/* Double check database table cardinality. */
 	printf("\n");
@@ -224,6 +257,10 @@ int main(int argc, char *argv[])
 	printf("%d second steady state duration\n", duration);
 	printf("\n");
 
+	set_sqlapi_operation(SQLAPI_SIMPLE);
+
+	start_db_threadpool();
+
 	if (perform_integrity_check && integrity_terminal_worker() != OK) {
 	   printf("You used wrong parameters or something wrong with database.\n");
 	   return 1;
@@ -236,105 +273,219 @@ int main(int argc, char *argv[])
 
 int parse_arguments(int argc, char *argv[])
 {
-	int i;
-	char *flag;
+	int c;
+	int rc = OK;
+	int i, j;
+	char dbms_name[16] = "";
 
-	if (argc < 9) {
+	struct option *dbms_long_options = NULL;
+	struct option *all_long_options;
+
+	static struct option main_long_options[] = {
+		{"customer", required_argument, 0, 1},
+		{"item", required_argument, 0, 2},
+		{"order", required_argument, 0, 3},
+		{"stock", required_argument, 0, 4},
+		{"new-order", required_argument, 0, 5},
+		{"mixd", required_argument, 0, 6},
+		{"mixo", required_argument, 0, 7},
+		{"mixp", required_argument, 0, 8},
+		{"mixs", required_argument, 0, 9},
+		{"ktd", required_argument, 0, 10},
+		{"ktn", required_argument, 0, 11},
+		{"kto", required_argument, 0, 12},
+		{"ktp", required_argument, 0, 13},
+		{"kts", required_argument, 0, 14},
+		{"ttd", required_argument, 0, 15},
+		{"ttn", required_argument, 0, 16},
+		{"tto", required_argument, 0, 17},
+		{"ttp", required_argument, 0, 18},
+		{"tts", required_argument, 0, 19},
+		{"no-thinktime", no_argument, 0, 20},
+		{"tpw", required_argument, 0, 21},
+		{"sleep", required_argument, 0, 22},
+		{"spread", required_argument, 0, 23},
+		{"seed",  required_argument, 0, 24},
+		{"altered", required_argument, 0, 25},
+		{0, 0, 0, 0}
+	};
+
+	if (argc < 4) {
 		return ERROR;
 	}
+	/* first stage choose dbms */
+	opterr = 0;
+	while(1) {
+		int option_index = 0;
 
-	for (i = 1; i < argc; i += 2) {
-		if (strlen(argv[i]) < 2) {
-			printf("invalid flag: %s\n", argv[i]);
-			exit(1);
+		static struct option long_options[] = {
+			{ 0, 0, 0, 0 }
+		};
+		c = getopt_long(argc, argv, "t:",
+			long_options, &option_index);
+		if (c == -1) {
+			break;
 		}
-		flag = argv[i] + 1;
-		if (strcmp(flag, "d") == 0) {
-			set_client_hostname(argv[i + 1]);
-		} else if (strcmp(flag, "z") == 0) {
-			strcpy(postmaster_port, argv[i + 1]);
-		} else if (strcmp(flag, "p") == 0) {
-			set_client_port(atoi(argv[i + 1]));
-		} else if (strcmp(flag, "l") == 0) {
-			set_duration(atoi(argv[i + 1]));
-		} else if (strcmp(flag, "w") == 0) {
-			set_table_cardinality(TABLE_WAREHOUSE, atoi(argv[i + 1]));
-		} else if (strcmp(flag, "c") == 0) {
-			set_table_cardinality(TABLE_CUSTOMER, atoi(argv[i + 1]));
-		} else if (strcmp(flag, "i") == 0) {
-			set_table_cardinality(TABLE_ITEM, atoi(argv[i + 1]));
-		} else if (strcmp(flag, "o") == 0) {
-			set_table_cardinality(TABLE_ORDER, atoi(argv[i + 1]));
-		} else if (strcmp(flag, "s") == 0) {
-			set_table_cardinality(TABLE_STOCK, atoi(argv[i + 1]));
-		} else if (strcmp(flag, "n") == 0) {
-			set_table_cardinality(TABLE_NEW_ORDER, atoi(argv[i + 1]));
-		} else if (strcmp(flag, "q") == 0) {
-			set_transaction_mix(PAYMENT, atof(argv[i + 1]));
-		} else if (strcmp(flag, "r") == 0) {
-			set_transaction_mix(ORDER_STATUS, atof(argv[i + 1]));
-		} else if (strcmp(flag, "e") == 0) {
-			set_transaction_mix(DELIVERY, atof(argv[i + 1]));
-		} else if (strcmp(flag, "t") == 0) {
-			set_transaction_mix(STOCK_LEVEL, atof(argv[i + 1]));
-		} else if (strcmp(flag, "z") == 0) {
+		switch (c) {
+		case 't':
+			strncpy(dbms_name, optarg, sizeof(dbms_name));
+			goto parse_dbc_type_done;
+			break;
+		}
+	}
+
+parse_dbc_type_done:
+	if(dbms_name[0] == '\0' || dbc_manager_set(dbms_name) != OK)
+		return ERROR;
+
+	/* second stage real parse */
+	dbms_long_options = dbc_manager_get_dbcoptions();
+
+	/* construct final long options */
+	for(i = 0; main_long_options[i].name != 0; i++);
+	for(j = 0; dbms_long_options[j].name != 0; j++);
+
+	all_long_options = malloc(sizeof(struct option) * (i + j + 1));
+	memcpy(all_long_options, main_long_options, i * sizeof(struct option));
+	memcpy(all_long_options + i, dbms_long_options, (j + 1) * sizeof(struct option));
+	optind = 1;
+	opterr = 1;
+	while (1) {
+		int option_index = 0;
+
+		c = getopt_long(argc, argv, "c:e:l:o:s:t:w:z",
+						all_long_options, &option_index);
+		if (c == -1) {
+			break;
+		}
+
+		switch (c) {
+		case 0:					/* dbc options */
+			if(dbc_manager_set_dbcoption(all_long_options[option_index].name, optarg) == ERROR)
+			{
+				rc = ERROR;
+				goto _end;
+			}
+			break;
+		case 'c':
+			db_connections = atoi(optarg);
+			break;
+		case 'e':
+			w_id_max = atoi(optarg);
+			break;
+		case 'l':
+			set_duration(atoi(optarg));
+			break;
+		case 'o':
+			strcpy(output_path, optarg);
+			break;
+		case 's':
+			w_id_min = atoi(optarg);
+			break;
+		case 'w':
+			set_table_cardinality(TABLE_WAREHOUSE, atoi(optarg));
+			break;
+		case 'z':
 			perform_integrity_check = 1;
-		} else if (strcmp(flag, "wmin") == 0) {
-			w_id_min = atoi(argv[i + 1]);
-		} else if (strcmp(flag, "wmax") == 0) {
-			w_id_max = atoi(argv[i + 1]);
-		} else if (strcmp(flag, "ktd") == 0) {
-			key_time.delivery = atoi(argv[i + 1]);
-		} else if (strcmp(flag, "ktn") == 0) {
-			key_time.new_order = atoi(argv[i + 1]);
-		} else if (strcmp(flag, "kto") == 0) {
-			key_time.order_status = atoi(argv[i + 1]);
-		} else if (strcmp(flag, "ktp") == 0) {
-			key_time.payment = atoi(argv[i + 1]);
-		} else if (strcmp(flag, "kts") == 0) {
-			key_time.stock_level = atoi(argv[i + 1]);
-		} else if (strcmp(flag, "ttd") == 0) {
-			think_time.delivery = atoi(argv[i + 1]);
-		} else if (strcmp(flag, "ttn") == 0) {
-			think_time.new_order = atoi(argv[i + 1]);
-		} else if (strcmp(flag, "tto") == 0) {
-			think_time.order_status = atoi(argv[i + 1]);
-		} else if (strcmp(flag, "ttp") == 0) {
-			think_time.payment = atoi(argv[i + 1]);
-		} else if (strcmp(flag, "tts") == 0) {
-			think_time.stock_level = atoi(argv[i + 1]);
-		} else if (strcmp(flag, "tpw") == 0) {
-			terminals_per_warehouse = atoi(argv[i + 1]);
-		} else if (strcmp(flag, "sleep") == 0) {
-			client_conn_sleep = atoi(argv[i + 1]);
-		} else if (strcmp(flag, "spread") == 0) {
-			spread = atoi(argv[i + 1]);
-		} else if (strcmp(flag, "seed") == 0) {
+			break;
+		/* long options */
+		case 1:
+			set_table_cardinality(TABLE_CUSTOMER, atoi(optarg));
+			break;
+		case 2:
+			set_table_cardinality(TABLE_ITEM, atoi(optarg));
+			break;
+		case 3:
+			set_table_cardinality(TABLE_ORDER, atoi(optarg));
+			break;
+		case 4:
+			set_table_cardinality(TABLE_STOCK, atoi(optarg));
+			break;
+		case 5:
+			set_table_cardinality(TABLE_NEW_ORDER, atoi(optarg));
+			break;
+		case 6:
+			set_transaction_mix(PAYMENT, atof(optarg));
+			break;
+		case 7:
+			set_transaction_mix(ORDER_STATUS, atof(optarg));
+			break;
+		case 8:
+			set_transaction_mix(DELIVERY, atof(optarg));
+			break;
+		case 9:
+			set_transaction_mix(STOCK_LEVEL, atof(optarg));
+			break;
+		case 10:
+			key_time.delivery = atoi(optarg);
+			break;
+		case 11:
+			key_time.new_order = atoi(optarg);
+			break;
+		case 12:
+			key_time.order_status = atoi(optarg);
+			break;
+		case 13:
+			key_time.payment = atoi(optarg);
+			break;
+		case 14:
+			key_time.stock_level = atoi(optarg);
+			break;
+		case 15:
+			think_time.delivery = atoi(optarg);
+			break;
+		case 16:
+			think_time.new_order = atoi(optarg);
+			break;
+		case 17:
+			think_time.order_status = atoi(optarg);
+			break;
+		case 18:
+			think_time.payment = atoi(optarg);
+			break;
+		case 19:
+			think_time.stock_level = atoi(optarg);
+			break;
+		case 20:
+			no_thinktime = 1;
+			break;
+		case 21:
+			terminals_per_warehouse = atoi(optarg);
+			break;
+		case 22:
+			client_conn_sleep = atoi(optarg);
+			break;
+		case 23:
+			spread = atoi(optarg);
+			break;
+		case 24:
+		{
 			int count;
 			int length;
 
 			seed = 0;
-			length = strlen(argv[i + 1]);
+			length = strlen(optarg);
 
 			for (count = 0; count < length; count++) {
-				seed += (argv[i + 1][count] - '0') *
+				seed += (optarg[count] - '0') *
 						(unsigned int) pow(10, length - (count + 1));
 			}
-		} else if (strcmp(flag, "altered") == 0) {
-			mode_altered = atoi(argv[i + 1]);
-#ifdef STANDALONE
-		} else if (strcmp(flag, "dbc") == 0) {
-			db_connections = atoi(argv[i + 1]);
-		} else if (strcmp(flag, "dbname") == 0) {
-			strcpy(sname, argv[i + 1]);
-#endif /* STANDALONE */
-		} else if (strcmp(flag, "outdir") == 0) {
-			strcpy(output_path, argv[i + 1]);
-		} else {
-			printf("invalid flag: %s\n", argv[i]);
-			exit(1);
+		}
+		break;
+		case 25:
+			mode_altered = atoi(optarg);
+			break;
+		case '?':
+			rc = ERROR;
+			goto _end;
+			break;
+		default:
+			break;
 		}
 	}
 
-	return OK;
+_end:
+	free(all_long_options);
+	free(dbms_long_options);
+	return rc;
 }

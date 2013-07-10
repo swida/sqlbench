@@ -14,51 +14,38 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
+#include <getopt.h>
 
 #include "common.h"
-#include "client_interface.h"
 #include "db.h"
 #include "input_data_generator.h"
 #include "logging.h"
 #include "transaction_data.h"
-
-#ifdef LIBPQ
-char postmaster_port[32];
-#endif /* LIBPQ */
-char connect_str[32] = "";
+#include "dbc.h"
 int mode_altered = 0;
-
 int main(int argc, char *argv[])
 {
 	int i;
 	int transaction = -1;
-	struct db_context_t dbc;
+	struct db_context_t *dbc;
 	union transaction_data_t transaction_data;
 
-	int port = 0;
-	int sockfd;
-	struct client_transaction_t client_txn;
+	int c;
+	char dbms_name[16] = "";
+	struct option *dbms_long_options = NULL;
 
 	init_common();
 	init_logging();
+	init_dbc_manager();
 
 	if (argc < 3) {
-		printf("usage: %s -d <connect string> -t d/n/o/p/s [-w #] [-c #] [-i #] [-o #] [-n #] [-p #]",
+		printf("usage: %s -t <dbms> -T d/n/o/p/s [-w #] [-c #] [-i #] [-o #] [-n #]",
 			argv[0]);
-#ifdef LIBPQ
-		printf(" -l #");
-#endif /* LIBPQ */
-		printf("\n\n");
-		printf("-d <connect string>\n");
-#ifdef ODBC
-		printf("\tdatabase connect string\n");
-#endif /* ODBC */
-#ifdef LIBPQ
-		printf("\tdatabase hostname\n");
-		printf("-l #\n");
-		printf("\tport of the postmaster\n");
-#endif /* LIBPQ */
-		printf("-t (d|n|o|p|s)\n");
+		printf("\n");
+		printf("-t <dbms>\n");
+		printf("\tavailable:%s\n", dbc_manager_get_dbcnames());
+		printf("%s", dbc_manager_get_dbcusages());
+		printf("-T (d|n|o|p|s)\n");
 		printf("\td = Delivery, n = New-Order, o = Order-Status,\n");
 		printf("\tp = Payment, s = Stock-Level\n");
 		printf("-w #\n");
@@ -73,66 +60,95 @@ int main(int argc, char *argv[])
 		printf("-n #\n");
 		printf("\tnew-order cardinality, default %d\n",
 			NEW_ORDER_CARDINALITY);
-		printf("-p #\n");
-		printf("\tport of client program, if -d is used, -d takes the address\n");
-		printf("\tof the client program host system\n");
 		return 1;
 	}
 
-	for (i = 1; i < argc; i += 2) {
-		if (strlen(argv[i]) != 2) {
-			printf("invalid flag: %s\n", argv[i]);
-			return 2;
+	/* first stage choose dbms */
+	opterr = 0;
+	while(1) {
+		int option_index = 0;
+
+		static struct option long_options[] = {
+			{ 0, 0, 0, 0 }
+		};
+		c = getopt_long(argc, argv, "t:",
+			long_options, &option_index);
+		if (c == -1) {
+			break;
 		}
-		if (argv[i][1] == 'd') {
-			strcpy(connect_str, argv[i + 1]);
-		} else if (argv[i][1] == 't') {
-			if (argv[i + 1][0] == 'd') {
-				transaction = DELIVERY;
-			} else if (argv[i + 1][0] == 'n') {
-				transaction = NEW_ORDER;
-			} else if (argv[i + 1][0] == 'o') {
-				transaction = ORDER_STATUS;
-			} else if (argv[i + 1][0] == 'p') {
-				transaction = PAYMENT;
-			} else if (argv[i + 1][0] == 's') {
-				transaction = STOCK_LEVEL;
-			} else {
-				printf("unknown transaction: %s\n",
-					argv[i + 1]);
-				return 3;
-			}
-		} else if (argv[i][1] == 'w') {
-			table_cardinality.warehouses = atoi(argv[i + 1]);
-		} else if (argv[i][1] == 'c') {
-			table_cardinality.customers = atoi(argv[i + 1]);
-		} else if (argv[i][1] == 'i') {
-			table_cardinality.items = atoi(argv[i + 1]);
-		} else if (argv[i][1] == 'o') {
-			table_cardinality.orders = atoi(argv[i + 1]);
-		} else if (argv[i][1] == 'n') {
-			table_cardinality.new_orders = atoi(argv[i + 1]);
-		} else if (argv[i][1] == 'p') {
-			port = atoi(argv[i + 1]);
-#ifdef LIBPQ
-		} else if (argv[i][1] == 'l') {
-			strcpy(postmaster_port, argv[i + 1]);
-#endif /* LIBPQ */
-		} else {
-			printf("invalid flag: %s\n", argv[i]);
-			return 2;
+		switch (c) {
+		case 't':
+			strncpy(dbms_name, optarg, sizeof(dbms_name));
+			break;
 		}
 	}
 
-	if (strlen(connect_str) == 0) {
-		printf("-d flag was not used.\n");
-		return 4;
+	if(dbms_name[0] == '\0' || dbc_manager_set(dbms_name) != OK)
+		return ERROR;
+
+	/* second stage real parse */
+	dbms_long_options = dbc_manager_get_dbcoptions();
+
+	optind = 1;
+	opterr = 1;
+	while (1) {
+		int option_index = 0;
+		c = getopt_long(argc, argv, "c:i:n:o:t:T:w:",
+			dbms_long_options, &option_index);
+		if (c == -1) {
+			break;
+		}
+
+		switch (c) {
+		case 0:
+			if(dbc_manager_set_dbcoption(dbms_long_options[option_index].name, optarg) == ERROR)
+				return 3;
+			break;
+		case 'T':
+			if (optarg[0] == 'd')
+				transaction = DELIVERY;
+			else if (optarg[0] == 'n')
+				transaction = NEW_ORDER;
+			else if (optarg[0] == 'o')
+				transaction = ORDER_STATUS;
+			else if (optarg[0] == 'p') 
+				transaction = PAYMENT;
+			else if (optarg[0] == 's') 
+				transaction = STOCK_LEVEL;
+			else {
+				printf("unknown transaction: %s\n", optarg);
+				return 3;
+			}
+			break;
+			case 'w':
+			table_cardinality.warehouses = atoi(optarg);
+			break;
+			case 'c':
+			table_cardinality.customers = atoi(optarg);
+			break;
+			case 'i':
+			table_cardinality.items = atoi(optarg);
+			break;
+			case 'o':
+			table_cardinality.orders = atoi(optarg);
+			break;
+			case 'n':
+			table_cardinality.new_orders = atoi(optarg);
+			break;
+		case '?':
+			return 3;
+			break;
+		default:
+			break;
+		}
 	}
 
 	if (transaction == -1) {
-		printf("-t flag was not used.\n");
+		printf("-T flag was not used.\n");
 		return 5;
 	}
+
+	set_sqlapi_operation(SQLAPI_SIMPLE);
 
 	/* Double check database table cardinality. */
 	printf("\n");
@@ -146,7 +162,7 @@ int main(int argc, char *argv[])
 	printf("new-orders = %d\n", table_cardinality.new_orders);
 	printf("\n");
 
-	srand(time(NULL));
+	set_random_seed(time(NULL));
 
 	/* Generate input data. */
 	bzero(&transaction_data, sizeof(union transaction_data_t));
@@ -178,55 +194,24 @@ int main(int argc, char *argv[])
 		break;
 	}
 
-	if (port == 0) {
 		/*
 		 * Process transaction by connecting directly to the database.
 		 */
 		printf("connecting directly to the database...\n");
-#ifdef ODBC
-		db_init(connect_str, DB_USER, DB_PASS);
-#endif /* ODBC */
-#ifdef LIBPQ
-		db_init(DB_NAME, connect_str, postmaster_port);
-#endif /* LIBPQ */
-		if (connect_to_db(&dbc) != OK) {
+
+		dbc = db_init();
+
+		if (connect_to_db(dbc) != OK) {
 			printf("cannot establish a database connection\n");
 			return 6;
 		}
-		if (process_transaction(transaction, &dbc,
+		if (process_transaction(transaction, dbc,
 			(void *) &transaction_data) != OK) {
-			disconnect_from_db(&dbc);
+			disconnect_from_db(dbc);
 			printf("transaction failed\n");
 			return 11;
 		}
-		disconnect_from_db(&dbc);
-	} else {
-		/* Process transaction by connecting to the client program. */
-		printf("connecting to client program on port %d...\n", port);
-
-		sockfd = connect_to_client(connect_str, port);
-		if (sockfd > 0) {
-			printf("connected to client\n");
-		}
-
-		client_txn.transaction = transaction;
-		memcpy(&client_txn.transaction_data, &transaction_data,
-			sizeof(union transaction_data_t));
-		printf("sending transaction data...\n");
-		if (send_transaction_data(sockfd, &client_txn) != OK) {
-			printf("send_transaction_data() error\n");
-			return 7;
-		}
-
-		printf("receiving transaction data...\n");
-		if (receive_transaction_data(sockfd, &client_txn) != OK) {
-			printf("receive_transaction_data() error\n");
-			return 8;
-		}
-
-		memcpy(&transaction_data, &client_txn.transaction_data,
-			sizeof(union transaction_data_t));
-	}
+		disconnect_from_db(dbc);
 
 	dump(stdout, transaction, (void *) &transaction_data);
 	printf("\ndone.\n");

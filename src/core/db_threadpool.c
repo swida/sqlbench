@@ -21,9 +21,7 @@
 #include <strings.h>
 
 #include "common.h"
-#include "listener.h"
 #include "logging.h"
-#include "client_interface.h"
 #include "transaction_queue.h"
 #include "db_threadpool.h"
 #include "db.h"
@@ -41,23 +39,13 @@ time_t *last_txn;
 /* These should probably be handled differently. */
 extern int exiting;
 sem_t db_worker_count;
-#ifdef STANDALONE
-extern FILE *log_mix;
-extern pthread_mutex_t mutex_mix_log;
-#endif /* STANDALONE */
 
 void *db_worker(void *data)
 {
         int id = *((int *) data); /* Whoa... */
-#ifndef STANDALONE
         int length;
-#endif /* NOT STANDALONE */
         struct transaction_queue_node_t *node;
         struct db_context_t *dbc;
-#ifdef STANDALONE
-        struct timeval rt0, rt1;
-        double response_time;
-#endif /* STANDALONE */
 
         /* Open a connection to the database. */
         dbc = db_init();
@@ -78,11 +66,7 @@ void *db_worker(void *data)
                         LOG_ERROR_MESSAGE("dequeue was null");
                         continue;
                 }
-#ifdef STANDALONE
-                if (gettimeofday(&rt0, NULL) == -1) {
-                        perror("gettimeofday");
-                }
-#endif /* STANDALONE */
+
                 node->client_data.status =
                         process_transaction(node->client_data.transaction,
                         dbc, &node->client_data.transaction_data);
@@ -95,37 +79,7 @@ void *db_worker(void *data)
                          * back, and try processing the next transaction.
                          */
                 }
-#ifdef STANDALONE
-                if (gettimeofday(&rt1, NULL) == -1) {
-                        perror("gettimeofday");
-                }
-                response_time = difftimeval(rt1, rt0);
-                pthread_mutex_lock(&mutex_mix_log);
-                fprintf(log_mix, "%d,%c,%f,%d\n", (int) time(NULL),
-                transaction_short_name[node->client_data.transaction],
-                        response_time, (int) pthread_self());
-                        fflush(log_mix);
-                pthread_mutex_unlock(&mutex_mix_log);
-#endif /* STANDALONE */
-
-#ifndef STANDALONE
-                length = send_transaction_data(node->s, &node->client_data);
-                if (length == ERROR) {
-                        LOG_ERROR_MESSAGE("send_transaction_data() error");
-                        /*
-                         * Assume this isn't a fatal error and try processing
-                         * the next transaction.
-                         */
-                }
-#endif /* NOT STANDALONE */
-                pthread_mutex_lock(&mutex_transaction_counter[REQ_EXECUTING][
-                        node->client_data.transaction]);
-                --transaction_counter[REQ_EXECUTING][
-                        node->client_data.transaction];
-                pthread_mutex_unlock(&mutex_transaction_counter[REQ_EXECUTING][
-                        node->client_data.transaction]);
-                recycle_node(node);
-
+				sem_post(&node->s);
                 /* Keep track of how many transactions this thread has done. */
                 ++worker_count[id];
 

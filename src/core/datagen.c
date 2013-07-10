@@ -157,7 +157,7 @@ void gen_customers(int worker_id, int start, int end)
 	struct tm *tm1;
 	time_t t1;
 
-	srand(0);
+	set_random_seed(0);
 	printf("Generating customer table data...\n");
 
 	output = open_output_stream(worker_id, "customer");
@@ -299,7 +299,7 @@ void gen_districts(int worker_id, int start, int end)
 	char a_string[48];
 	char filename[1024] = "\0";
 
-	srand(0);
+	set_random_seed(0);
 	printf("Generating district table data...\n");
 
 	output = open_output_stream(worker_id, "district");
@@ -381,7 +381,7 @@ void gen_history(int worker_id, int start, int end)
 	time_t t1;
 	char filename[1024] = "\0";
 
-	srand(0);
+	set_random_seed(0);
 	printf("Generating history table data...\n");
 
 	output = open_output_stream(worker_id, "history");
@@ -451,7 +451,7 @@ void gen_items()
 	int j;
 	char filename[1024] = "\0";
 
-	srand(0);
+	set_random_seed(0);
 	printf("Generating item table data...\n");
 
 	output = open_output_stream(0, "item");
@@ -502,7 +502,7 @@ void gen_new_orders(int worker_id, int start, int end)
 	int i, j, k;
 	char filename[1024] = "\0";
 
-	srand(0);
+	set_random_seed(0);
 	printf("Generating new-order table data...\n");
 
 	output = open_output_stream(worker_id, "new_order");
@@ -556,7 +556,7 @@ void gen_orders(int worker_id, int start, int end)
 
 	int o_ol_cnt;
 
-	srand(0);
+	set_random_seed(0);
 	printf("Generating order and order-line table data...\n");
 
 	order = open_output_stream(worker_id, "orders");
@@ -738,7 +738,7 @@ void gen_stock(int worker_id, int start, int end)
 	char a_string[128];
 	char filename[1024] = "\0";
 
-	srand(0);
+	set_random_seed(0);
 	printf("Generating stock table data...\n");
 
 	output = open_output_stream(worker_id, "stock");
@@ -848,7 +848,7 @@ void gen_warehouses(int worker_id, int start, int end)
 	char a_string[48];
 	char filename[1024] = "\0";
 
-	srand(0);
+	set_random_seed(0);
 	printf("Generating warehouse table data...\n");
 
 	output = open_output_stream(worker_id, "warehouse");
@@ -918,19 +918,34 @@ struct datagen_context_t
 	int gen_items;				/* 1, this worker will gen items data also*/
 };
 
+typedef void (*table_loader)(int workid, int start, int end);
+
+table_loader table_loaders[] = {
+	gen_warehouses,
+	gen_stock,
+	gen_districts,
+	gen_customers,
+	gen_history,
+	gen_orders,
+	gen_new_orders
+};
+
+int table_loader_count = sizeof(table_loaders) / sizeof(table_loaders[0]);
 void *datagen_worker(void *data)
 {
-	struct datagen_context_t *dc;
-	dc = (struct datagen_context_t *) data;
+	int i = 0;
+	struct datagen_context_t *dc = (struct datagen_context_t *) data;
+	int loader = dc->worker_id % table_loader_count;
 	if(dc->gen_items == 1)
 		gen_items();
-	gen_warehouses(dc->worker_id, dc->start_warehouse, dc->end_warehouse);
-	gen_stock(dc->worker_id, dc->start_warehouse, dc->end_warehouse);
-	gen_districts(dc->worker_id, dc->start_warehouse, dc->end_warehouse);
-	gen_customers(dc->worker_id, dc->start_warehouse, dc->end_warehouse);
-	gen_history(dc->worker_id, dc->start_warehouse, dc->end_warehouse);
-	gen_orders(dc->worker_id, dc->start_warehouse, dc->end_warehouse);
-	gen_new_orders(dc->worker_id, dc->start_warehouse, dc->end_warehouse);
+	while( i < table_loader_count)
+	{
+		(*table_loaders[loader])(dc->worker_id, dc->start_warehouse, dc->end_warehouse);
+		i++;
+		loader++;
+		if(loader == table_loader_count)
+			loader = 0;
+	}
 	return NULL;
 }
 

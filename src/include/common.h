@@ -103,7 +103,7 @@
 #define CLIENT_PORT 30000
 
 #define CLIENT_PID_FILENAME "dbt2_client.pid"
-#define DRIVER_PID_FILENAME "dbt2_driver.pid"
+#define DRIVER_PID_FILENAME "sqlbench.pid"
 
 
 struct table_cardinality_t {
@@ -124,6 +124,7 @@ void get_l_string(char *l_string, int x, int y);
 void get_n_string(char *n_string, int x, int y);
 int get_nurand(int a, int x, int y);
 double get_percentage();
+void set_random_seed(unsigned int s);
 int get_random(int max);
 int get_think_time(int mean_think_time);
 int init_common();
