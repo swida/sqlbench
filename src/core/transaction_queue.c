@@ -105,3 +105,11 @@ int init_transaction_queue()
 
 	return OK;
 }
+
+int signal_transaction_queue()
+{
+	pthread_mutex_lock(&mutex_queue);
+	sem_post(&queue_length);
+	pthread_mutex_unlock(&mutex_queue);
+	return OK;
+}

@@ -14,8 +14,6 @@
 
 #include <_semaphore.h>
 #include "transaction_data.h"
-#define REQ_QUEUED 0
-#define REQ_EXECUTING 1
 
 struct transaction_queue_node_t
 {
@@ -28,7 +26,6 @@ struct transaction_queue_node_t
 struct transaction_queue_node_t *dequeue_transaction();
 int enqueue_transaction(struct transaction_queue_node_t *node);
 int init_transaction_queue();
-
-extern sem_t queue_length;
+int signal_transaction_queue();
 
 #endif /* _TRANSACTION_QUEUE_H_ */

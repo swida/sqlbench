@@ -70,6 +70,8 @@ pthread_mutex_t mutex_terminal_state[3][TRANSACTION_MAX] = {
 		PTHREAD_MUTEX_INITIALIZER }
 };
 
+extern int exiting;
+
 int create_pid_file()
 {
 	FILE * fpid;
@@ -409,13 +411,14 @@ int start_driver()
 		}
 	}
 
-#if 0
 	do {
 		/* Loop until all the DB worker threads have exited. */
+		exiting = 1;
+		signal_transaction_queue();
 		sem_getvalue(&db_worker_count, &count);
 		sleep(1);
 	} while (count > 0);
-#endif
+
 	printf("driver is exiting normally\n");
 	return OK;
 }
@@ -441,8 +444,6 @@ void *terminal_worker(void *data)
 			malloc(sizeof(struct transaction_queue_node_t));
 
 	client_data = &node->client_data;
-
-	extern int exiting;
 
 	if (sem_init(&node->s, 0, 0) != 0)
 	{
