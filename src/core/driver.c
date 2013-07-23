@@ -52,24 +52,6 @@ int threads_start_time= 0;
 FILE *log_mix = NULL;
 pthread_mutex_t mutex_mix_log = PTHREAD_MUTEX_INITIALIZER;
 
-int terminal_state[3][TRANSACTION_MAX] = {
-	{ 0, 0, 0, 0, 0 },
-	{ 0, 0, 0, 0, 0 },
-	{ 0, 0, 0, 0, 0 }
-};
-
-pthread_mutex_t mutex_terminal_state[3][TRANSACTION_MAX] = {
-	{ PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
-		PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
-		PTHREAD_MUTEX_INITIALIZER },
-	{ PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
-		PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
-		PTHREAD_MUTEX_INITIALIZER },
-	{ PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
-		PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
-		PTHREAD_MUTEX_INITIALIZER }
-};
-
 extern int exiting;
 
 int create_pid_file()
@@ -528,28 +510,11 @@ void *terminal_worker(void *data)
 		}
 
 		/* Keying time... */
-		pthread_mutex_lock(
-				&mutex_terminal_state[KEYING][client_data->transaction]);
-		++terminal_state[KEYING][client_data->transaction];
-		pthread_mutex_unlock(
-				&mutex_terminal_state[KEYING][client_data->transaction]);
 		if (time(NULL) < stop_time) {
 			sleep(keying_time);
 		} else {
 			break;
 		}
-		pthread_mutex_lock(
-				&mutex_terminal_state[KEYING][client_data->transaction]);
-		--terminal_state[KEYING][client_data->transaction];
-		pthread_mutex_unlock(
-				&mutex_terminal_state[KEYING][client_data->transaction]);
-
-		/* Note this thread is executing a transation. */
-		pthread_mutex_lock(
-				&mutex_terminal_state[EXECUTING][client_data->transaction]);
-		++terminal_state[EXECUTING][client_data->transaction];
-		pthread_mutex_unlock(
-				&mutex_terminal_state[EXECUTING][client_data->transaction]);
 		/* Execute transaction and record the response time. */
 		if (gettimeofday(&rt0, NULL) == -1) {
 			perror("gettimeofday");
@@ -566,24 +531,18 @@ void *terminal_worker(void *data)
 		} else if (node->client_data.status == ERROR) {
 			code = 'E';
 		}
-		/* mix log record in db_threadpool */
+
 		if (gettimeofday(&rt1, NULL) == -1) {
 			perror("gettimeofday");
 		}
+
 		response_time = difftimeval(rt1, rt0);
 		pthread_mutex_lock(&mutex_mix_log);
 		fprintf(log_mix, "%d,%c,%c,%f,%d\n", (int) (time(NULL) - start_time),
 				transaction_short_name[client_data->transaction], code, response_time, tc->t_id);
 		fflush(log_mix);
 		pthread_mutex_unlock(&mutex_mix_log);
-		pthread_mutex_lock(&mutex_terminal_state[EXECUTING][client_data->transaction]);
-		--terminal_state[EXECUTING][client_data->transaction];
-		pthread_mutex_unlock(&mutex_terminal_state[EXECUTING][client_data->transaction]);
 
-		/* Thinking time... */
-		pthread_mutex_lock(&mutex_terminal_state[THINKING][client_data->transaction]);
-		++terminal_state[THINKING][client_data->transaction];
-		pthread_mutex_unlock(&mutex_terminal_state[THINKING][client_data->transaction]);
 		if (time(NULL) < stop_time) {
 			thinking_time.tv_nsec = (long) get_think_time(mean_think_time);
 			thinking_time.tv_sec = (time_t) (thinking_time.tv_nsec / 1000);
@@ -600,9 +559,6 @@ void *terminal_worker(void *data)
 				}
 			}
 		}
-		pthread_mutex_lock(&mutex_terminal_state[THINKING][client_data->transaction]);
-		--terminal_state[THINKING][client_data->transaction];
-		pthread_mutex_unlock(&mutex_terminal_state[THINKING][client_data->transaction]);
 
 		if (node == NULL) {
 			LOG_ERROR_MESSAGE("Cannot get a transaction node.\n");

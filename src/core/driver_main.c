@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
 		printf("--altered #\n");
 		printf("\trun with a thread per user, and will start # threads\n");
 		printf("--sleep #\n");
-		printf("\tnumber of milliseconds to sleep between terminal creation\n");
+		printf("\tnumber of milliseconds to sleep between terminal creation or openning db connections\n");
 		printf("--spread #\n");
 		printf("\tfancy warehouse skipping trick for low i/o runs\n");
 		return 1;
@@ -453,7 +453,7 @@ parse_dbc_type_done:
 			terminals_per_warehouse = atoi(optarg);
 			break;
 		case 22:
-			client_conn_sleep = atoi(optarg);
+			db_conn_sleep = client_conn_sleep = atoi(optarg);
 			break;
 		case 23:
 			spread = atoi(optarg);
