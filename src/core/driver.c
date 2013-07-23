@@ -38,9 +38,9 @@ pthread_t** g_tid = NULL;
 struct transaction_mix_t transaction_mix;
 struct key_time_t key_time;
 struct think_time_t think_time;
-char hostname[32];
 int duration = 0;
 int stop_time = 0;
+int start_time = 0;
 int w_id_min = 0, w_id_max = 0;
 int terminals_per_warehouse = 0;
 int mode_altered = 0;
@@ -205,14 +205,6 @@ int recalculate_mix()
 	return OK;
 }
 
-int set_client_hostname(char *addr)
-{
-	strcpy(hostname, addr);
-	printf("connecting to client at '%s'\n", hostname);
-	fflush(stdout);
-	return OK;
-}
-
 int set_duration(int seconds)
 {
 	duration = seconds;
@@ -309,6 +301,12 @@ int start_driver()
 				malloc(sizeof(pthread_t) * terminals_per_warehouse);
 	}
 
+	pthread_mutex_lock(&mutex_mix_log);
+	start_time = (int) time(NULL);
+	fprintf(log_mix, "%d,RAMPUP,,,\n", start_time);
+	fflush(log_mix);
+	pthread_mutex_unlock(&mutex_mix_log);
+
 	for (j = 0; j < terminals_per_warehouse; j++) {
 		for (i = w_id_min; i < w_id_max + 1; i += spread) {
 			int ret;
@@ -320,6 +318,8 @@ int start_driver()
 					malloc(sizeof(struct terminal_context_t));
 			tc->w_id = i;
 			tc->d_id = j + 1;
+			tc->t_id = count;
+
 			if (pthread_attr_init(&attr) != 0) {
 				LOG_ERROR_MESSAGE("could not init pthread attr: %d",
 						(i + j + 1) * terminals_per_warehouse);
@@ -382,7 +382,7 @@ int start_driver()
 
 	/* Note that the driver has started up all threads in the log. */
 	pthread_mutex_lock(&mutex_mix_log);
-	fprintf(log_mix, "%d,START,,,\n", (int) time(NULL));
+	fprintf(log_mix, "%d,START,,,\n", (int) time(NULL) - start_time);
 	fflush(log_mix);
 	pthread_mutex_unlock(&mutex_mix_log);
 
@@ -571,9 +571,8 @@ void *terminal_worker(void *data)
 		}
 		response_time = difftimeval(rt1, rt0);
 		pthread_mutex_lock(&mutex_mix_log);
-		fprintf(log_mix, "%d,%c,%c,%f,%lu\n", (int) time(NULL),
-				transaction_short_name[client_data->transaction], code,
-				response_time, (unsigned long) pthread_self());
+		fprintf(log_mix, "%d,%c,%c,%f,%d\n", (int) (time(NULL) - start_time),
+				transaction_short_name[client_data->transaction], code, response_time, tc->t_id);
 		fflush(log_mix);
 		pthread_mutex_unlock(&mutex_mix_log);
 		pthread_mutex_lock(&mutex_terminal_state[EXECUTING][client_data->transaction]);
@@ -615,7 +614,7 @@ void *terminal_worker(void *data)
 
 	/* Note when each thread has exited. */
 	pthread_mutex_lock(&mutex_mix_log);
-	fprintf(log_mix, "%d,TERMINATED,,,%lu\n", (int) time(NULL), (unsigned long)pthread_self());
+	fprintf(log_mix, "%d,TERMINATED,,,%d\n", (int) (time(NULL) - start_time), tc->t_id);
 	fflush(log_mix);
 	pthread_mutex_unlock(&mutex_mix_log);
 	return NULL; /* keep the compiler quiet */

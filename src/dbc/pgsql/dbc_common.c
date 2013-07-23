@@ -144,6 +144,7 @@ pgsql_sql_execute(struct db_context_t *_dbc, char * query, struct sql_result_t *
 	{
 		sql_result->result_set = res;
 		sql_result->current_row = -1;
+		sql_result->num_rows = PQntuples(res);
 	}
 
 	return OK;

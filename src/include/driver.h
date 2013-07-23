@@ -46,6 +46,7 @@ struct terminal_context_t
 {
 	int w_id;
 	int d_id;
+	int t_id;					/* terminal global unique id */
 };
 
 struct transaction_mix_t
@@ -84,7 +85,6 @@ int init_driver();
 int init_driver_logging();
 int integrity_terminal_worker();
 int recalculate_mix();
-int set_client_hostname(char *addr);
 int set_client_port(int port);
 int set_duration(int seconds);
 int set_table_cardinality(int table, int cardinality);

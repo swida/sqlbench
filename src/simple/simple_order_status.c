@@ -80,84 +80,86 @@ int order_status(struct db_context_t *dbc, struct order_status_t *data, char ** 
 #ifdef DEBUG_QUERY
 		LOG_ERROR_MESSAGE("ORDER_STATUS_1 %s\n", query);
 #endif
-
+		result.num_rows = -1;
 		if (dbc_sql_execute(dbc, query, &result, "ORDER_STATUS_1") && result.result_set)
 		{
 			// 2.6.2.2 says the (n/2 rounded up)-th row
-#ifdef HAVE_SQL_RESULT_NUM_ROWS
-        	unsigned long skip_rows;
-            skip_rows=(result.num_rows+1)/2;
-			do {
-				dbc_sql_fetchrow(dbc, &result);
-				skip_rows--;
-			} while (skip_rows > 0);
-            vals[TMP_C_ID]= dbc_sql_getvalue(dbc, &result, 0); //TMP_C_ID
-
-            if (!vals[TMP_C_ID])
-            {
-				LOG_ERROR_MESSAGE("ERROR: TMP_C_ID=NULL for query ORDER_STATUS_1:\n%s\n", query);
-				return -1;
-            }
-
-            my_c_id = atoi(vals[TMP_C_ID]);
-#else
-			// A real PITA when we don't know the number of rows
-			int c_ids_static_array[16];
-			int * c_ids_array = c_ids_static_array;
-			int c_ids_alloc_count = 0;
-			int c_ids_result_count = 0;
-			while (dbc_sql_fetchrow(dbc, &result))
+			if(result.num_rows != -1)
 			{
-				if (c_ids_result_count >= 16
-					&& c_ids_result_count >= c_ids_alloc_count)
+				unsigned long skip_rows;
+				skip_rows=(result.num_rows+1)/2;
+				do {
+					dbc_sql_fetchrow(dbc, &result);
+					skip_rows--;
+				} while (skip_rows > 0);
+				vals[TMP_C_ID]= dbc_sql_getvalue(dbc, &result, 0); //TMP_C_ID
+
+				if (!vals[TMP_C_ID])
 				{
-					if (c_ids_alloc_count == 0)
+					LOG_ERROR_MESSAGE("ERROR: TMP_C_ID=NULL for query ORDER_STATUS_1:\n%s\n", query);
+					return -1;
+				}
+
+				my_c_id = atoi(vals[TMP_C_ID]);
+			}
+			else
+			{
+				// A real PITA when we don't know the number of rows
+				int c_ids_static_array[16];
+				int * c_ids_array = c_ids_static_array;
+				int c_ids_alloc_count = 0;
+				int c_ids_result_count = 0;
+				while (dbc_sql_fetchrow(dbc, &result))
+				{
+					if (c_ids_result_count >= 16
+						&& c_ids_result_count >= c_ids_alloc_count)
 					{
-						c_ids_alloc_count = 32;
-						if (!(c_ids_array = realloc(NULL, c_ids_alloc_count*sizeof(int))))
+						if (c_ids_alloc_count == 0)
 						{
-							LOG_ERROR_MESSAGE("order_status: REALLOC FAILED trying to expand to 32 entries for middle result\n");
-							return -1;
+							c_ids_alloc_count = 32;
+							if (!(c_ids_array = realloc(NULL, c_ids_alloc_count*sizeof(int))))
+							{
+								LOG_ERROR_MESSAGE("order_status: REALLOC FAILED trying to expand to 32 entries for middle result\n");
+								return -1;
+							}
+							memcpy(c_ids_array, c_ids_static_array, sizeof(c_ids_static_array));
 						}
-						memcpy(c_ids_array, c_ids_static_array, sizeof(c_ids_static_array));
+						else
+						{
+							c_ids_alloc_count *= 2;
+							if (!(c_ids_array = realloc(c_ids_array, c_ids_alloc_count*sizeof(int))))
+							{
+								LOG_ERROR_MESSAGE("order_status: REALLOC FAILED trying to expand to %d entries for middle result\n", c_ids_alloc_count);
+								return -1;
+							}
+						}
+					}
+					vals[TMP_C_ID]= dbc_sql_getvalue(dbc, &result, 0);
+
+					if (vals[TMP_C_ID])
+					{
+						c_ids_array[c_ids_result_count] = atoi(vals[TMP_C_ID]);
+						free(vals[TMP_C_ID]);
 					}
 					else
 					{
-						c_ids_alloc_count *= 2;
-						if (!(c_ids_array = realloc(c_ids_array, c_ids_alloc_count*sizeof(int))))
-						{
-							LOG_ERROR_MESSAGE("order_status: REALLOC FAILED trying to expand to %d entries for middle result\n", c_ids_alloc_count);
-							return -1;
-						}
+						c_ids_array[c_ids_result_count] = -1;
 					}
+					c_ids_result_count++;
+					vals[TMP_C_ID] = NULL;
 				}
-				vals[TMP_C_ID]= dbc_sql_getvalue(dbc, &result, 0);
-
-				if (vals[TMP_C_ID])
+				my_c_id = c_ids_array[(c_ids_result_count-1)/2];
+				if (c_ids_alloc_count)
 				{
-					c_ids_array[c_ids_result_count] = atoi(vals[TMP_C_ID]);
-					free(vals[TMP_C_ID]);
+					free(c_ids_array);
 				}
-				else
+				if (my_c_id == -1 || c_ids_result_count == 0)
 				{
-					c_ids_array[c_ids_result_count] = -1;
+					LOG_ERROR_MESSAGE("ERROR: TMP_C_ID=NULL for query ORDER_STATUS_1:\n%s\n", query);
+					return -1;
 				}
-				c_ids_result_count++;
-				vals[TMP_C_ID] = NULL;
 			}
-            my_c_id = c_ids_array[(c_ids_result_count-1)/2];
-			if (c_ids_alloc_count)
-			{
-				free(c_ids_array);
-			}
-			if (my_c_id == -1 || c_ids_result_count == 0)
-			{
-				LOG_ERROR_MESSAGE("ERROR: TMP_C_ID=NULL for query ORDER_STATUS_1:\n%s\n", query);
-				return -1;
-			}
-#endif /* HAVE_SQL_RESULT_NUM_ROWS */
             dbc_sql_close_cursor(dbc, &result);
-
 		}
 		else //error
 		{

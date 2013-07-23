@@ -25,9 +25,10 @@ enum sqlapi_type
 struct db_context_t {
 };
 
-struct sql_result_t 
+struct sql_result_t
 {
 	void *result_set;
+	int num_rows;				/* -1 is unknown, just order-status use it. */
 	int current_row;
 };
 
