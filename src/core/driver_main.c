@@ -50,6 +50,8 @@ int main(int argc, char *argv[])
 		printf("\tnumber of database connections\n");
 		printf("-w #\n");
 		printf("\twarehouse cardinality, default 1\n");
+		printf("-r #\n");
+		printf("\tthe duration of ramp up in seconds\n");
 		printf("-l #\n");
 		printf("\tthe duration of the run in seconds\n");
 		printf("\n");
@@ -120,8 +122,6 @@ int main(int argc, char *argv[])
 		printf("\trun with a thread per user, and will start # threads\n");
 		printf("--sleep #\n");
 		printf("\tnumber of milliseconds to sleep between terminal creation or openning db connections\n");
-		printf("--spread #\n");
-		printf("\tfancy warehouse skipping trick for low i/o runs\n");
 		return 1;
 	}
 
@@ -153,7 +153,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (recalculate_mix() != OK) {
-		printf("invalid transaction mix: -e %0.2f. -r %0.2f. -q %0.2f. -t %0.2f. causes new-order mix of %0.2f.\n",
+		printf("invalid transaction mix: --mixd %0.2f. --mixo %0.2f. --mixp %0.2f. --mixs %0.2f. causes new-order mix of %0.2f.\n",
 				transaction_mix.delivery_actual,
 				transaction_mix.order_status_actual,
 				transaction_mix.payment_actual,
@@ -188,7 +188,11 @@ int main(int argc, char *argv[])
 	} else {
 		printf("Output directory of log files: current directory\n");
 	}
-
+	if(mode_altered > 0)
+	{
+		printf("\n");
+		printf("altered mode enabled, will start %d threads\n", mode_altered);
+	}
 	/* Double database conections. */
 	printf("\n");
 	printf("database connection:\n");
@@ -232,11 +236,11 @@ int main(int argc, char *argv[])
 	printf("\n");
 
 	/* Double check the keying time. */
-	printf("delivery keying time %d s\n", key_time.delivery);
-	printf("new_order keying time %d s\n", key_time.new_order);
-	printf("order-status keying time %d s\n", key_time.order_status);
-	printf("payment keying time %d s\n", key_time.payment);
-	printf("stock-level keying time %d s\n", key_time.stock_level);
+	printf("delivery keying time %ds\n", key_time.delivery);
+	printf("new_order keying time %ds\n", key_time.new_order);
+	printf("order-status keying time %ds\n", key_time.order_status);
+	printf("payment keying time %ds\n", key_time.payment);
+	printf("stock-level keying time %ds\n", key_time.stock_level);
 	printf("\n");
 
 	/* Double check the thinking time. */
@@ -249,23 +253,21 @@ int main(int argc, char *argv[])
 	printf("\n");
 
 	printf("w_id range %d to %d\n", w_id_min, w_id_max);
-	printf("\n");
-
 	printf("%d terminals per warehouse\n", terminals_per_warehouse);
 	printf("\n");
-
-	printf("%d second steady state duration\n", duration);
+	if(duration_rampup > 0)
+		printf("%d seconds ramp up state duration\n", duration_rampup);
+	printf("%d seconds steady state duration\n", duration);
 	printf("\n");
 
 	set_sqlapi_operation(SQLAPI_SIMPLE);
-
-	start_db_threadpool();
 
 	if (perform_integrity_check && integrity_terminal_worker() != OK) {
 	   printf("You used wrong parameters or something wrong with database.\n");
 	   return 1;
 	}
 
+	start_db_threadpool();
 	start_driver();
 
 	return 0;
@@ -304,9 +306,8 @@ int parse_arguments(int argc, char *argv[])
 		{"no-thinktime", no_argument, 0, 20},
 		{"tpw", required_argument, 0, 21},
 		{"sleep", required_argument, 0, 22},
-		{"spread", required_argument, 0, 23},
-		{"seed",  required_argument, 0, 24},
-		{"altered", required_argument, 0, 25},
+		{"seed",  required_argument, 0, 23},
+		{"altered", required_argument, 0, 24},
 		{0, 0, 0, 0}
 	};
 
@@ -353,7 +354,7 @@ parse_dbc_type_done:
 	while (1) {
 		int option_index = 0;
 
-		c = getopt_long(argc, argv, "c:e:l:o:s:t:w:z",
+		c = getopt_long(argc, argv, "c:e:l:o:s:r:t:w:z",
 						all_long_options, &option_index);
 		if (c == -1) {
 			break;
@@ -378,6 +379,9 @@ parse_dbc_type_done:
 			break;
 		case 'o':
 			strcpy(output_path, optarg);
+			break;
+		case 'r':
+			duration_rampup = atoi(optarg);
 			break;
 		case 's':
 			w_id_min = atoi(optarg);
@@ -456,9 +460,6 @@ parse_dbc_type_done:
 			db_conn_sleep = client_conn_sleep = atoi(optarg);
 			break;
 		case 23:
-			spread = atoi(optarg);
-			break;
-		case 24:
 		{
 			int count;
 			int length;
@@ -472,7 +473,7 @@ parse_dbc_type_done:
 			}
 		}
 		break;
-		case 25:
+		case 24:
 			mode_altered = atoi(optarg);
 			break;
 		case '?':

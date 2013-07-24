@@ -7,7 +7,7 @@ extern int pgsql_dbc_init();
 struct dbc_construct_t dbc_constructs[] =
 {
 	{pgsql_dbc_init},
-	NULL
+	{NULL},
 };
 
 struct dbc_desc_t

@@ -8,7 +8,6 @@
  *
  * 7 august 2002
  */
-
 #ifndef _DRIVER_H_
 #define _DRIVER_H_
 
@@ -40,13 +39,6 @@ struct key_time_t
 	int order_status;
 	int payment;
 	int stock_level;
-};
-
-struct terminal_context_t
-{
-	int w_id;
-	int d_id;
-	int t_id;					/* terminal global unique id */
 };
 
 struct transaction_mix_t
@@ -90,18 +82,19 @@ int set_duration(int seconds);
 int set_table_cardinality(int table, int cardinality);
 int set_transaction_mix(int transaction, double mix);
 int start_driver();
+void log_transaction_mix(int transaction, char code, double response_time, unsigned int term_id);
+int start_db_threadpool(void);
 
 extern struct transaction_mix_t transaction_mix;
 extern struct key_time_t key_time;
 extern struct think_time_t think_time;
-extern char hostname[32];
-extern int port;
 extern int duration;
+extern int duration_rampup;
 extern int w_id_min, w_id_max;
 extern int terminals_per_warehouse;
+extern int terminals_per_thread;
 extern int mode_altered;
 extern unsigned int seed;
 extern int client_conn_sleep;
-extern int spread;
 
 #endif /* _DRIVER_H_ */

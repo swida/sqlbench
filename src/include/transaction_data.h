@@ -156,7 +156,6 @@ union transaction_data_t
 
 struct client_transaction_t
 {
-	int status;
 	int transaction;
 	union transaction_data_t transaction_data;
 };

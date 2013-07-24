@@ -21,11 +21,6 @@
 #include <sys/time.h>
 #include <assert.h>
 
-#define DB_USER "dbt"
-#define DB_PASS ""
-
-#define DB_NAME "dbt2"
-
 #define DELIVERY 0
 #define NEW_ORDER 1
 #define ORDER_STATUS 2
@@ -100,11 +95,7 @@
 #define O_OL_CNT_MAX 15
 #define O_CARRIER_ID_MAX 10
 
-#define CLIENT_PORT 30000
-
-#define CLIENT_PID_FILENAME "dbt2_client.pid"
 #define DRIVER_PID_FILENAME "sqlbench.pid"
-
 
 struct table_cardinality_t {
 	int warehouses;

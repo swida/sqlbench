@@ -42,7 +42,7 @@ int stock_level(struct db_context_t *dbc, struct stock_level_t *data, char ** va
 	struct sql_result_t result;
 
 	int d_next_o_id = 0;
-	int low_stock = 0;
+	int low_stock;
 	char query[256];
 
 	int D_NEXT_O_ID=0;
@@ -92,6 +92,7 @@ int stock_level(struct db_context_t *dbc, struct stock_level_t *data, char ** va
             return -1;
 		}
 		low_stock = atoi(vals[LOW_STOCK]);
+		(void)low_stock;
 	}
 	else //error
 	{

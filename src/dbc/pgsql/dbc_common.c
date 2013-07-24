@@ -153,7 +153,6 @@ pgsql_sql_execute(struct db_context_t *_dbc, char * query, struct sql_result_t *
 static int
 pgsql_sql_fetchrow(struct db_context_t *_dbc, struct sql_result_t * sql_result)
 {
-	struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
 	PGresult *res = (PGresult *)sql_result->result_set;
 	sql_result->current_row++;
 	if(sql_result->current_row >= PQntuples(res))
@@ -164,15 +163,14 @@ pgsql_sql_fetchrow(struct db_context_t *_dbc, struct sql_result_t * sql_result)
 static int
 pgsql_sql_close_cursor(struct db_context_t *_dbc, struct sql_result_t * sql_result)
 {
-	struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
 	PGresult *res = (PGresult *)sql_result->result_set;
 	PQclear(res);
+	return 1;
 }
 
 static char *
 pgsql_sql_getvalue(struct db_context_t *_dbc, struct sql_result_t * sql_result, int field)
 {
-	struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
 	PGresult *res = (PGresult *)sql_result->result_set;
 	char *tmp = NULL;
 	if (sql_result->current_row < 0 ||sql_result->current_row >= PQntuples(res) || field > PQnfields(res))
@@ -272,4 +270,5 @@ pgsql_dbc_init()
 	pgsql_info->dbc_get_options = pgsql_dbc_get_options;
 	pgsql_info->dbc_set_option = pgsql_dbc_set_option;
 	dbc_manager_add(pgsql_info);
+	return OK;
 }

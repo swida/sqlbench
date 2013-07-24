@@ -22,9 +22,9 @@
 
 #include "common.h"
 #include "logging.h"
-#include "transaction_queue.h"
-#include "db_threadpool.h"
 #include "db.h"
+#include "terminal_queue.h"
+#include "driver.h"
 
 /* Function Prototypes */
 void *db_worker(void *data);
@@ -42,59 +42,106 @@ sem_t db_worker_count;
 
 void *db_worker(void *data)
 {
-        int id = *((int *) data); /* Whoa... */
-        int length;
-        struct transaction_queue_node_t *node;
-        struct db_context_t *dbc;
+	int id = *((int *) data); /* Whoa... */
 
-        /* Open a connection to the database. */
-        dbc = db_init();
+	struct transaction_queue_node_t *node;
+	struct db_context_t *dbc;
+	char code;
+	double response_time;
+	struct timeval rt0, rt1;
+	int local_seed;
+	pid_t pid;
+	pthread_t tid;
+	extern unsigned int seed;
+	int status;
 
-        if (!exiting && connect_to_db(dbc) != OK) {
-                LOG_ERROR_MESSAGE("connect_to_db() error, terminating program");
-                printf("cannot connect to database(see details in error.log file, exiting...\n");
-                exit(1);
-        }
+	/* Each thread needs to seed in Linux. */
+    tid = pthread_self();
+    pid = getpid();
+	if (seed == -1) {
+		struct timeval tv;
+		unsigned long junk; /* Purposely used uninitialized */
 
-        while (!exiting) {
-                /*
-                 * I know this loop will prevent the program from exiting
-                 * because of the dequeue...
-                 */
-                node = dequeue_transaction();
-                if (node == NULL) {
-                        LOG_ERROR_MESSAGE("dequeue was null");
-                        continue;
-                }
+		local_seed = pid;
+		gettimeofday(&tv, NULL);
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+		local_seed ^=  tid ^ tv.tv_sec ^ tv.tv_usec ^ junk;
+#pragma GCC diagnostic warning "-Wmaybe-uninitialized"
+	} else {
+		local_seed = seed;
+	}
+	set_random_seed(local_seed);
 
-                node->client_data.status =
-                        process_transaction(node->client_data.transaction,
-                        dbc, &node->client_data.transaction_data);
-                if (node->client_data.status == ERROR) {
-                        LOG_ERROR_MESSAGE("process_transaction() error on %s",
-                                transaction_name[
-                                node->client_data.transaction]);
-                        /*
-                         * Assume this isn't a fatal error, send the results
-                         * back, and try processing the next transaction.
-                         */
-                }
-				sem_post(&node->s);
-                /* Keep track of how many transactions this thread has done. */
-                ++worker_count[id];
+	/* Open a connection to the database. */
+	dbc = db_init();
 
-                /* Keep track of then the last transaction was execute. */
-                time(&last_txn[id]);
-        }
+	if (!exiting && connect_to_db(dbc) != OK) {
+		LOG_ERROR_MESSAGE("connect_to_db() error, terminating program");
+		printf("cannot connect to database(see details in error.log file, exiting...\n");
+		exit(1);
+	}
 
-        /* Disconnect from the database. */
-        disconnect_from_db(dbc);
+	while (!exiting) {
+		/*
+		 * I know this loop will prevent the program from exiting
+		 * because of the dequeue...
+		 */
+		node = dequeue_transaction();
+		if (node == NULL) {
+			LOG_ERROR_MESSAGE("dequeue was null");
+			continue;
+		}
 
-		free(dbc);
+		/* Execute transaction and record the response time. */
+		if (gettimeofday(&rt0, NULL) == -1) {
+			perror("gettimeofday");
+		}
 
-        sem_wait(&db_worker_count);
+		status =
+			process_transaction(node->client_data.transaction,
+								dbc, &node->client_data.transaction_data);
+		if (status == ERROR) {
+			LOG_ERROR_MESSAGE("process_transaction() error on %s",
+							  transaction_name[
+								  node->client_data.transaction]);
+			/*
+			 * Assume this isn't a fatal error, send the results
+			 * back, and try processing the next transaction.
+			 */
+		}
 
-        return NULL;        /* keep compiler quiet */
+		if (status == OK) {
+			code = 'C';
+		} else if (status == STATUS_ROLLBACK) {
+			code = 'R';
+		} else if (status == ERROR) {
+			code = 'E';
+		}
+
+		if (gettimeofday(&rt1, NULL) == -1) {
+			perror("gettimeofday");
+		}
+
+		response_time = difftimeval(rt1, rt0);
+		log_transaction_mix(node->client_data.transaction, code, response_time,
+							mode_altered > 0 ? node->termworker_id : node->term_id);
+		enqueue_terminal(node->termworker_id, node->term_id);
+
+		/* Keep track of how many transactions this thread has done. */
+		++worker_count[id];
+
+		/* Keep track of then the last transaction was execute. */
+		time(&last_txn[id]);
+	}
+
+	/* Disconnect from the database. */
+	disconnect_from_db(dbc);
+
+	free(dbc);
+
+	sem_wait(&db_worker_count);
+
+	return NULL;        /* keep compiler quiet */
 }
 
 int db_threadpool_init()
@@ -152,8 +199,13 @@ int db_threadpool_init()
 
                 /* Keep a count of how many DB worker threads have started. */
                 sem_post(&db_worker_count);
+				if ((i + 1) % 5 == 0) {
+					printf("%d / %d db connections opened...\n", i + 1, db_connections);
+					fflush(stdout);
+				}
 
-                /* Don't let the database connection attempts occur too fast. */                while (nanosleep(&ts, &rem) == -1) {
+                /* Don't let the database connection attempts occur too fast. */
+				while (nanosleep(&ts, &rem) == -1) {
                         if (errno == EINTR) {
                                 memcpy(&ts, &rem, sizeof(struct timespec));
                         } else {
@@ -163,7 +215,7 @@ int db_threadpool_init()
                                 break;
                         }
                 }
-		pthread_attr_destroy(&attr);
+				pthread_attr_destroy(&attr);
         }
         return OK;
 }

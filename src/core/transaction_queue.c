@@ -10,6 +10,8 @@
 #include <common.h>
 #include <logging.h>
 #include <transaction_queue.h>
+#include <_semaphore.h>
+
 #ifdef DEBUG
 #include <unistd.h>
 #include <string.h>
@@ -20,7 +22,7 @@ int dump_queue();
 sem_t queue_length;
 struct transaction_queue_node_t *transaction_head, *transaction_tail;
 pthread_mutex_t mutex_queue = PTHREAD_MUTEX_INITIALIZER;
-int transaction_id;
+volatile int transaction_id;
 
 #ifdef DEBUG
 int dump_queue()

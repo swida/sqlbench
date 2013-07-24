@@ -26,15 +26,14 @@
 #include "driver.h"
 #include "input_data_generator.h"
 #include "db.h"
-#include "transaction_queue.h"
 #include "db_threadpool.h"
+#include "terminal_queue.h"
 
 #define MIX_LOG_NAME "mix.log"
 
-void *terminal_worker(void *data);
+void *terminals_worker(void *data);
 
 /* Global Variables */
-pthread_t** g_tid = NULL;
 struct transaction_mix_t transaction_mix;
 struct key_time_t key_time;
 struct think_time_t think_time;
@@ -46,11 +45,11 @@ int terminals_per_warehouse = 0;
 int mode_altered = 0;
 unsigned int seed = -1;
 int client_conn_sleep = 1000; /* milliseconds */
-int spread = 1;
-int threads_start_time= 0;
-
+int duration_rampup = 0;
 FILE *log_mix = NULL;
 pthread_mutex_t mutex_mix_log = PTHREAD_MUTEX_INITIALIZER;
+
+int terminals_per_thread = 50;
 
 extern int exiting;
 
@@ -113,39 +112,42 @@ int init_driver_logging()
 
 int integrity_terminal_worker()
 {
+
 	int rc;
-	struct client_transaction_t *client_data;
-
-	struct transaction_queue_node_t *node =
-			(struct transaction_queue_node_t *)
-			malloc(sizeof(struct transaction_queue_node_t));
-
-	if (sem_init(&node->s, 0, 0) != 0)
-	{
-		LOG_ERROR_MESSAGE("cannot init tran_status");
+	struct db_context_t *dbc;
+	struct client_transaction_t client_data;
+	client_data.transaction = INTEGRITY;
+	/* Open a connection to the database. */
+	dbc = db_init();
+	if (connect_to_db(dbc) != OK) {
+		LOG_ERROR_MESSAGE("connect_to_db() error");
+		printf("cannot connect to database(see details in error.log file, exiting...\n");
+		free(dbc);
 		return ERROR;
 	}
 
-	client_data = &node->client_data;
-	client_data->transaction = INTEGRITY;
+	generate_input_data(client_data.transaction,
+			&client_data.transaction_data, table_cardinality.warehouses);
 
-	generate_input_data(client_data->transaction,
-			&client_data->transaction_data, table_cardinality.warehouses);
-
-	enqueue_transaction(node);
-	sem_wait(&node->s);
+	rc = process_transaction(client_data.transaction,
+							 dbc, &client_data.transaction_data);
 
 #ifdef DEBUG
-	printf("executing transaction %c\n"
+	printf("executing transaction %c\n",
 			 transaction_short_name[client_data.transaction]);
 	fflush(stdout);
 
 	LOG_ERROR_MESSAGE("executing transaction %c",
 			transaction_short_name[client_data.transaction]);
 #endif /* DEBUG */
-	sem_destroy(&node->s);
-	free(node);
+
+	/* Disconnect from the database. */
+	disconnect_from_db(dbc);
+
+	free(dbc);
+
 	return rc;
+
 }
 
 int recalculate_mix()
@@ -244,7 +246,7 @@ int set_transaction_mix(int transaction, double mix)
 	return OK;
 }
 
-int start_db_threadpool()
+int start_db_threadpool(void)
 {
 	printf("opening %d connection(s) to database...\n", db_connections);
 	/* Open database connectiosn. */
@@ -257,113 +259,98 @@ int start_db_threadpool()
 	return OK;
 }
 
+void _format_time(char *disp_str, int len, time_t t)
+{
+	struct tm *tm_disp = localtime(&t);
+	strftime(disp_str, len, "%F %T", tm_disp);
+}
+
 int start_driver()
 {
-	int i, j;
+	int i;
 	struct timespec ts, rem;
-
+	char tm_disp_str[200];
+	pthread_t* tids;
+	int threads_start_time;
 	/* Just used to count the number of threads created. */
 	int count = 0;
+	int thread_count = mode_altered > 0 ? mode_altered :
+		(((w_id_max - w_id_min + 1) * terminals_per_warehouse + terminals_per_thread - 1)
+		 / terminals_per_thread);
 
 	ts.tv_sec = (time_t) (client_conn_sleep / 1000);
 	ts.tv_nsec = (long) (client_conn_sleep % 1000) * 1000000;
 
 	/* Caulculate when the test should stop. */
-	threads_start_time = (int) ((double) client_conn_sleep / 1000.0 *
-			(double) terminals_per_warehouse *
-			(double) (w_id_max - w_id_min));
-
-	stop_time = time(NULL) + duration + threads_start_time;
-	printf("driver is starting to ramp up at time %d\n", (int) time(NULL));
-	printf("driver will ramp up in  %d seconds\n", threads_start_time);
-	printf("will stop test at time %d\n", stop_time);
+	threads_start_time = (int) ((double) client_conn_sleep / 1000.0 * thread_count);
+	if(threads_start_time > duration_rampup)
+		duration_rampup = threads_start_time;
+	stop_time = time(NULL) + duration + duration_rampup;
+	_format_time(tm_disp_str, sizeof(tm_disp_str), time(NULL));
+	printf("driver is starting to ramp up at time %s\n", tm_disp_str);
+	printf("driver will ramp up in %d seconds\n", duration_rampup);
+	_format_time(tm_disp_str, sizeof(tm_disp_str), stop_time);
+	printf("will stop test at time %s\n", tm_disp_str);
 
 	/* allocate g_tid */
-	g_tid = (pthread_t**) malloc(sizeof(pthread_t*) * (w_id_max+1)/spread);
-	for (i = w_id_min; i < w_id_max + 1; i += spread) {
-		g_tid[i] = (pthread_t*)
-				malloc(sizeof(pthread_t) * terminals_per_warehouse);
-	}
-
+	tids = malloc(sizeof(pthread_t) * thread_count);
+	init_termworker_array(thread_count);
 	pthread_mutex_lock(&mutex_mix_log);
 	start_time = (int) time(NULL);
-	fprintf(log_mix, "%d,RAMPUP,,,\n", start_time);
+	fprintf(log_mix, "0,RAMPUP,,,%d\n", start_time);
 	fflush(log_mix);
 	pthread_mutex_unlock(&mutex_mix_log);
+	for (i = 0; i < thread_count; i++) {
+		int ret;
+		pthread_attr_t attr;
+		size_t stacksize = 131072; /* 128 kilobytes. */
 
-	for (j = 0; j < terminals_per_warehouse; j++) {
-		for (i = w_id_min; i < w_id_max + 1; i += spread) {
-			int ret;
-			pthread_attr_t attr;
-			size_t stacksize = 131072; /* 128 kilobytes. */
-			struct terminal_context_t *tc;
+		struct termworker_context_t *tc = init_termworker_context(i, thread_count);
 
-			tc = (struct terminal_context_t *)
-					malloc(sizeof(struct terminal_context_t));
-			tc->w_id = i;
-			tc->d_id = j + 1;
-			tc->t_id = count;
+		if (pthread_attr_init(&attr) != 0) {
+			LOG_ERROR_MESSAGE("could not init pthread attr: %d", i);
+			return ERROR;
+		}
 
-			if (pthread_attr_init(&attr) != 0) {
-				LOG_ERROR_MESSAGE("could not init pthread attr: %d",
-						(i + j + 1) * terminals_per_warehouse);
-				return ERROR;
+		if (pthread_attr_setstacksize(&attr, stacksize) != 0) {
+			LOG_ERROR_MESSAGE("could not set pthread stack size: %d", i);
+			return ERROR;
+		}
+
+		ret = pthread_create(&tids[i], &attr, &terminals_worker, tc);
+
+		if (ret != 0) {
+			perror("pthread_create");
+			LOG_ERROR_MESSAGE( "error creating terminal thread: %d", i);
+			if (ret == EAGAIN) {
+				LOG_ERROR_MESSAGE( "not enough system resources: %d", i);
 			}
+			return ERROR;
+		}
 
-			if (pthread_attr_setstacksize(&attr, stacksize) != 0) {
-				LOG_ERROR_MESSAGE("could not set pthread stack size: %d",
-						(i + j + 1) * terminals_per_warehouse);
-				return ERROR;
-			}
-			ret = pthread_create(&g_tid[i][j], &attr, &terminal_worker,
-					(void *) tc);
-			if (ret != 0) {
-				perror("pthread_create");
-				LOG_ERROR_MESSAGE( "error creating terminal thread: %d",
-						(i + j + 1) * terminals_per_warehouse);
-				if (ret == EAGAIN) {
-					LOG_ERROR_MESSAGE( "not enough system resources: %d",
-							(i + j + 1) * terminals_per_warehouse);
-				}
-				return ERROR;
-			}
+		++count;
+		if (count % 20 == 0) {
+			printf("%d / %d threads started...\n", count, thread_count);
+			fflush(stdout);
+		}
 
-			++count;
-			if ((count % 100) == 0) {
-				printf("%d / %d threads started...\n", count,
-						terminals_per_warehouse *
-								(w_id_max - w_id_min + 1) / spread);
-				fflush(stdout);
-			}
-
-			/* Sleep for between starting terminals. */
-			while (nanosleep(&ts, &rem) == -1) {
-				if (errno == EINTR) {
-					memcpy(&ts, &rem, sizeof(struct timespec));
-				} else {
-					LOG_ERROR_MESSAGE(
-							"sleep time invalid %d s %ls ns",
-							ts.tv_sec, ts.tv_nsec);
-					break;
-				}
-			}
-			pthread_attr_destroy(&attr);
-			if (mode_altered > 0 && count >= mode_altered)
+		/* Sleep for between starting terminals. */
+		while (nanosleep(&ts, &rem) == -1) {
+			if (errno == EINTR) {
+				memcpy(&ts, &rem, sizeof(struct timespec));
+			} else {
+				LOG_ERROR_MESSAGE(
+					"sleep time invalid %d s %ls ns",
+					ts.tv_sec, ts.tv_nsec);
 				break;
+			}
 		}
-
-		if (mode_altered > 0) {
-			/*
-			 * This effectively allows one client to touch
-			 * the entire warehouse range.  The setting of
-			 * w_id and d_id is moot in this case.
-			 */
-			printf("altered mode detected\n");
-			break;
-		}
+		pthread_attr_destroy(&attr);
 	}
+
 	printf("terminals started...\n");
 
+	sleep(duration_rampup - threads_start_time);
 	/* Note that the driver has started up all threads in the log. */
 	pthread_mutex_lock(&mutex_mix_log);
 	fprintf(log_mix, "%d,START,,,\n", (int) time(NULL) - start_time);
@@ -371,28 +358,14 @@ int start_driver()
 	pthread_mutex_unlock(&mutex_mix_log);
 
 	/* wait until all threads quit */
-	for (i = w_id_min; i < w_id_max + 1; i += spread) {
-		for (j = 0; j < terminals_per_warehouse; j++) {
-			if (pthread_join(g_tid[i][j], NULL) != 0) {
-				LOG_ERROR_MESSAGE("error join terminal thread");
-				return ERROR;
-			}
-			count --;
-			if (mode_altered > 0 && count <= 0)
-				break;
+	for (i = 0; i < thread_count; i++) {
+		if (pthread_join(tids[i], NULL) != 0) {
+			LOG_ERROR_MESSAGE("error join terminal thread");
+			return ERROR;
 		}
-
-		if (mode_altered > 0) {
-			/*
-			 * This effectively allows one client to touch
-			 * the entire warehouse range.  The setting of
-			 * w_id and d_id is moot in this case.
-			 */
-			printf("altered mode detected\n");
-			break;
-		}
+		count --;
 	}
-
+	free(tids);
 	do {
 		/* Loop until all the DB worker threads have exited. */
 		exiting = 1;
@@ -400,40 +373,29 @@ int start_driver()
 		sem_getvalue(&db_worker_count, &count);
 		sleep(1);
 	} while (count > 0);
-
+	destroy_termworker_array(thread_count);
 	printf("driver is exiting normally\n");
 	return OK;
 }
 
-void *terminal_worker(void *data)
+void log_transaction_mix(int transaction, char code, double response_time, unsigned int term_id)
 {
-	struct terminal_context_t *tc;
-	struct client_transaction_t *client_data;
-	double threshold;
-	int keying_time;
-	struct timespec thinking_time, rem;
-	int mean_think_time; /* In milliseconds. */
-	struct timeval rt0, rt1;
-	double response_time;
+	pthread_mutex_lock(&mutex_mix_log);
+	fprintf(log_mix, "%d,%c,%c,%f,%d\n", (int) (time(NULL) - start_time),
+			transaction_short_name[transaction], code, response_time, term_id);
+	fflush(log_mix);
+	pthread_mutex_unlock(&mutex_mix_log);
+}
+
+void *terminals_worker(void *data)
+{
+	struct termworker_context_t *tc;
 	extern int errno;
 	int local_seed;
 	pid_t pid;
 	pthread_t tid;
-	char code;
+	int i;
 
-	struct transaction_queue_node_t *node =
-			(struct transaction_queue_node_t *)
-			malloc(sizeof(struct transaction_queue_node_t));
-
-	client_data = &node->client_data;
-
-	if (sem_init(&node->s, 0, 0) != 0)
-	{
-		LOG_ERROR_MESSAGE("cannot init tran_status");
-		return NULL;
-	}
-
-	tc = (struct terminal_context_t *) data;
 	/* Each thread needs to seed in Linux. */
     tid = pthread_self();
     pid = getpid();
@@ -443,136 +405,88 @@ void *terminal_worker(void *data)
 
 		local_seed = pid;
 		gettimeofday(&tv, NULL);
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 		local_seed ^=  tid ^ tv.tv_sec ^ tv.tv_usec ^ junk;
+#pragma GCC diagnostic warning "-Wmaybe-uninitialized"
 	} else {
 		local_seed = seed;
 	}
-	printf("seed for %d:%x : %u\n",
-			(unsigned int) pid, (unsigned int) tid, local_seed);
-	fflush(stdout);
-	srand(local_seed);
+	set_random_seed(local_seed);
+
+	tc = (struct termworker_context_t *)data;
+
+	for(i = tc->start_term; i < tc->end_term; i++)
+	{
+		struct transaction_queue_node_t *node =
+			&tc->term_queue.terminals[i - tc->start_term].node;
+		node->term_id = i;
+		node->termworker_id = tc->id;
+		enqueue_terminal(tc->id, i);
+	}
 
 	do {
+		int w_id, d_id;
+		struct transaction_queue_node_t *node;
+		struct client_transaction_t *client_data;
+		struct timespec delay, rem;
+		struct terminal_t *term =
+			dequeue_terminal(tc->id, (unsigned int *)&delay.tv_nsec);
+
+		delay.tv_sec = (time_t) (delay.tv_nsec / 1000);
+		delay.tv_nsec = (delay.tv_nsec % 1000) * 1000000;
+		while (nanosleep(&delay, &rem) == -1) {
+			if (errno == EINTR) {
+				memcpy(&delay, &rem, sizeof(struct timespec));
+			} else {
+				LOG_ERROR_MESSAGE(
+					"sleep time invalid %d s %ls ns",
+					delay.tv_sec,
+					delay.tv_nsec);
+				break;
+			}
+		}
+
+		node = &term->node;
+		client_data = &node->client_data;
+
 		if (mode_altered > 0) {
 			/*
 			 * Determine w_id and d_id for the client per
 			 * transaction.
 			 */
-			tc->w_id = w_id_min + get_random(w_id_max - w_id_min + 1);
-			tc->d_id = get_random(table_cardinality.districts) + 1;
+			w_id = w_id_min + get_random(w_id_max - w_id_min + 1);
+			d_id = get_random(table_cardinality.districts) + 1;
 		}
 
-		/*
-		 * Determine which transaction to execute, minimum keying time,
-		 * and mean think time.
-		 */
-		threshold = get_percentage();
-		if (threshold < transaction_mix.new_order_threshold) {
-			client_data->transaction = NEW_ORDER;
-			keying_time = key_time.new_order;
-			mean_think_time = think_time.new_order;
-		} else if (transaction_mix.payment_actual != 0 &&
-			threshold < transaction_mix.payment_threshold) {
-			client_data->transaction = PAYMENT;
-			keying_time = key_time.payment;
-			mean_think_time = think_time.payment;
-		} else if (transaction_mix.order_status_actual != 0 &&
-			threshold < transaction_mix.order_status_threshold) {
-			client_data->transaction = ORDER_STATUS;
-			keying_time = key_time.order_status;
-			mean_think_time = think_time.order_status;
-		} else if (transaction_mix.delivery_actual != 0 &&
-			threshold < transaction_mix.delivery_threshold) {
-			client_data->transaction = DELIVERY;
-			keying_time = key_time.delivery;
-			mean_think_time = think_time.delivery;
-		} else {
-			client_data->transaction = STOCK_LEVEL;
-			keying_time = key_time.stock_level;
-			mean_think_time = think_time.stock_level;
-		}
+		w_id = term->id % (w_id_max - w_id_min + 1) + w_id_min;
+		d_id = term->id / (w_id_max - w_id_min + 1) + 1;
 
 #ifdef DEBUG
 		printf("executing transaction %c\n",
-			transaction_short_name[client_data->transaction]);
+			   transaction_short_name[client_data->transaction]);
 		fflush(stdout);
 		LOG_ERROR_MESSAGE("executing transaction %c",
-			transaction_short_name[client_data->transaction]);
+						  transaction_short_name[client_data->transaction]);
 #endif /* DEBUG */
 
 		/* Generate the input data for the transaction. */
 		if (client_data->transaction != STOCK_LEVEL) {
 			generate_input_data(client_data->transaction,
-					&client_data->transaction_data, tc->w_id);
+								&client_data->transaction_data, w_id);
 		} else {
 			generate_input_data2(client_data->transaction,
-					&client_data->transaction_data, tc->w_id, tc->d_id);
-		}
-
-		/* Keying time... */
-		if (time(NULL) < stop_time) {
-			sleep(keying_time);
-		} else {
-			break;
-		}
-		/* Execute transaction and record the response time. */
-		if (gettimeofday(&rt0, NULL) == -1) {
-			perror("gettimeofday");
+								 &client_data->transaction_data, w_id, d_id);
 		}
 
 		enqueue_transaction(node);
 
-		sem_wait(&node->s);
-
-		if (node->client_data.status == OK) {
-			code = 'C';
-		} else if (node->client_data.status == STATUS_ROLLBACK) {
-			code = 'R';
-		} else if (node->client_data.status == ERROR) {
-			code = 'E';
-		}
-
-		if (gettimeofday(&rt1, NULL) == -1) {
-			perror("gettimeofday");
-		}
-
-		response_time = difftimeval(rt1, rt0);
-		pthread_mutex_lock(&mutex_mix_log);
-		fprintf(log_mix, "%d,%c,%c,%f,%d\n", (int) (time(NULL) - start_time),
-				transaction_short_name[client_data->transaction], code, response_time, tc->t_id);
-		fflush(log_mix);
-		pthread_mutex_unlock(&mutex_mix_log);
-
-		if (time(NULL) < stop_time) {
-			thinking_time.tv_nsec = (long) get_think_time(mean_think_time);
-			thinking_time.tv_sec = (time_t) (thinking_time.tv_nsec / 1000);
-			thinking_time.tv_nsec = (thinking_time.tv_nsec % 1000) * 1000000;
-			while (nanosleep(&thinking_time, &rem) == -1) {
-				if (errno == EINTR) {
-					memcpy(&thinking_time, &rem, sizeof(struct timespec));
-				} else {
-					LOG_ERROR_MESSAGE(
-							"sleep time invalid %d s %ls ns",
-							thinking_time.tv_sec,
-							thinking_time.tv_nsec);
-					break;
-				}
-			}
-		}
-
-		if (node == NULL) {
-			LOG_ERROR_MESSAGE("Cannot get a transaction node.\n");
-		}
-
 	} while (time(NULL) < stop_time);
-
-	sem_destroy(&node->s);
-	free(node);
 
 	/* Note when each thread has exited. */
 	pthread_mutex_lock(&mutex_mix_log);
-	fprintf(log_mix, "%d,TERMINATED,,,%d\n", (int) (time(NULL) - start_time), tc->t_id);
+	fprintf(log_mix, "%d,TERMINATED,,,%d-%d\n", (int) (time(NULL) - start_time), tc->start_term, tc->end_term);
 	fflush(log_mix);
 	pthread_mutex_unlock(&mutex_mix_log);
+
 	return NULL; /* keep the compiler quiet */
 }

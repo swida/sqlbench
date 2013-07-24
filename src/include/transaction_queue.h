@@ -12,13 +12,13 @@
 #ifndef _TRANSACTION_QUEUE_H_
 #define _TRANSACTION_QUEUE_H_
 
-#include <_semaphore.h>
 #include "transaction_data.h"
 
 struct transaction_queue_node_t
 {
-	sem_t s;
 	int id;
+	int termworker_id;
+	int term_id;
 	struct client_transaction_t client_data;
 	struct transaction_queue_node_t *next;
 };

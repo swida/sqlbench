@@ -297,7 +297,6 @@ void gen_districts(int worker_id, int start, int end)
 	FILE *output;
 	int i, j;
 	char a_string[48];
-	char filename[1024] = "\0";
 
 	set_random_seed(0);
 	printf("Generating district table data...\n");
@@ -379,7 +378,6 @@ void gen_history(int worker_id, int start, int end)
 	char a_string[64];
 	struct tm *tm1;
 	time_t t1;
-	char filename[1024] = "\0";
 
 	set_random_seed(0);
 	printf("Generating history table data...\n");
@@ -449,7 +447,6 @@ void gen_items()
 	int i;
 	char a_string[128];
 	int j;
-	char filename[1024] = "\0";
 
 	set_random_seed(0);
 	printf("Generating item table data...\n");
@@ -500,7 +497,6 @@ void gen_new_orders(int worker_id, int start, int end)
 {
 	FILE *output;
 	int i, j, k;
-	char filename[1024] = "\0";
 
 	set_random_seed(0);
 	printf("Generating new-order table data...\n");
@@ -542,7 +538,6 @@ void gen_orders(int worker_id, int start, int end)
 	char a_string[64];
 	struct tm *tm1;
 	time_t t1;
-	char filename[1024] = "\0";
 
 	struct node_t {
 		int value;
@@ -736,7 +731,6 @@ void gen_stock(int worker_id, int start, int end)
 	FILE *output;
 	int i, j, k;
 	char a_string[128];
-	char filename[1024] = "\0";
 
 	set_random_seed(0);
 	printf("Generating stock table data...\n");
@@ -846,7 +840,6 @@ void gen_warehouses(int worker_id, int start, int end)
 	FILE *output;
 	int i;
 	char a_string[48];
-	char filename[1024] = "\0";
 
 	set_random_seed(0);
 	printf("Generating warehouse table data...\n");

@@ -25,7 +25,6 @@
 int mode_altered = 0;
 int main(int argc, char *argv[])
 {
-	int i;
 	int transaction = -1;
 	struct db_context_t *dbc;
 	union transaction_data_t transaction_data;
