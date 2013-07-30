@@ -6,10 +6,9 @@
  * Copyright (C) 2004 Alexey Stroganov & MySQL AB.
  *
  */
+#include "pgsql_common.h"
 
-#include "libpq_integrity.h"
-
-int execute_integrity(struct db_context_t *dbc, struct integrity_t *data)
+int pgsql_sp_integrity(struct db_context_t *dbc, struct integrity_t *data)
 {
 
 /* Integrity tests should be implemented  */

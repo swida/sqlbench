@@ -1,1 +1,1 @@
-SUBDIRS = dbc simple core include
+SUBDIRS = dbc simple storeproc core include

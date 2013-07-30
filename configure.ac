@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([sqlbench], [0.3.9], [dianchengwang@gmail.com])
+AC_INIT([sqlbench], [0.4.0], [dianchengwang@gmail.com])
 AM_INIT_AUTOMAKE([silent-rules])
 AC_CONFIG_SRCDIR([src/core/driver.c])
 AC_CONFIG_HEADERS([config.h])
@@ -55,6 +55,16 @@ AC_FUNC_REALLOC
 AC_CHECK_FUNCS([bzero gethostbyaddr gethostbyname gettimeofday socket strerror])
 
 AC_DEFINE(STRICT_ASCII_STRING, 1, [strict string to use ascii only.])
-AC_CONFIG_FILES([Makefile src/Makefile src/core/Makefile src/dbc/Makefile
-			  src/dbc/pgsql/Makefile src/simple/Makefile src/include/Makefile])
+AC_CONFIG_FILES(
+	[Makefile
+	src/Makefile
+	src/core/Makefile
+	src/dbc/Makefile
+	src/dbc/pgsql/Makefile
+	src/simple/Makefile
+	src/storeproc/Makefile
+	src/storeproc/pgsql/Makefile
+	src/storeproc/pgsql/c/Makefile
+	src/storeproc/pgsql/plpgsql/Makefile
+	src/include/Makefile])
 AC_OUTPUT

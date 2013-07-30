@@ -31,6 +31,8 @@ struct dbc_info_t *make_dbc_info(const char *dbcname, const char *dbcusage)
 	struct dbc_info_t *info = malloc(sizeof(struct dbc_info_t));
 	info->dbc_name = (char *)dbcname;
 	info->dbc_usage = (char *)dbcusage;
+	/* not support storeproc testing by default */
+	info->dbc_storeproc_operation = NULL;
 
 	/* default configurations */
 	info->is_forupdate_supported = 1;
@@ -113,6 +115,17 @@ int dbc_manager_set_dbcoption(const char *optname, const char *optvalue)
 	return (*(_dbc_info->dbc_set_option))(optname, optvalue);
 }
 
+char *dbc_manager_get_name()
+{
+	return _dbc_info->dbc_name;
+}
+
+int dbc_manager_is_storeproc_supported()
+{
+	assert(_dbc_info);
+	return _dbc_info->dbc_storeproc_operation != NULL;
+}
+
 /* interfaces */
 struct db_context_t *
 dbc_db_init(void)
@@ -191,3 +204,62 @@ dbc_sql_getvalue(struct db_context_t *dbc, struct sql_result_t * sql_result, int
 	struct dbc_sql_operation_t *sop = _dbc_info->dbc_sql_operation;
 	return (*(sop->sql_getvalue))(dbc, sql_result, field);
 }
+
+/* storeproc */
+int dbc_execsp_integrity (struct db_context_t *dbc, struct integrity_t *data)
+{
+	assert(_dbc_info);
+	struct dbc_storeproc_operation_t *sop = _dbc_info->dbc_storeproc_operation;
+	assert(sop);
+	return (*(sop->exec_sp_integrity))(dbc, data);
+}
+
+int dbc_execsp_delivery (struct db_context_t *dbc, struct delivery_t *data)
+{
+	assert(_dbc_info);
+	struct dbc_storeproc_operation_t *sop = _dbc_info->dbc_storeproc_operation;
+	assert(sop);
+	return (*(sop->exec_sp_delivery))(dbc, data);
+}
+
+int dbc_execsp_new_order (struct db_context_t *dbc, struct new_order_t *data)
+{
+	assert(_dbc_info);
+	struct dbc_storeproc_operation_t *sop = _dbc_info->dbc_storeproc_operation;
+	assert(sop);
+	return (*(sop->exec_sp_new_order))(dbc, data);
+}
+
+int dbc_execsp_order_status (struct db_context_t *dbc, struct order_status_t *data)
+{
+	assert(_dbc_info);
+	struct dbc_storeproc_operation_t *sop = _dbc_info->dbc_storeproc_operation;
+	assert(sop);
+	return (*(sop->exec_sp_order_status))(dbc, data);
+}
+
+int dbc_execsp_payment (struct db_context_t *dbc, struct payment_t *data)
+{
+	assert(_dbc_info);
+	struct dbc_storeproc_operation_t *sop = _dbc_info->dbc_storeproc_operation;
+	assert(sop);
+	return (*(sop->exec_sp_payment))(dbc, data);
+}
+
+int dbc_execsp_stock_level (struct db_context_t *dbc, struct stock_level_t *data)
+{
+	assert(_dbc_info);
+	struct dbc_storeproc_operation_t *sop = _dbc_info->dbc_storeproc_operation;
+	assert(sop);
+	return (*(sop->exec_sp_stock_level))(dbc, data);
+}
+
+struct sqlapi_operation_t storeproc_sqlapi_operation =
+{
+	dbc_execsp_integrity,
+	dbc_execsp_delivery,
+	dbc_execsp_new_order,
+	dbc_execsp_order_status,
+	dbc_execsp_payment,
+	dbc_execsp_stock_level
+};

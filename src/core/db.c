@@ -17,7 +17,7 @@
 
 static struct sqlapi_operation_t *sbo;
 extern struct sqlapi_operation_t simple_sqlapi_operation;
-
+extern struct sqlapi_operation_t storeproc_sqlapi_operation;
 void set_sqlapi_operation(enum sqlapi_type sa_type)
 {
 	switch(sa_type) {
@@ -26,7 +26,8 @@ void set_sqlapi_operation(enum sqlapi_type sa_type)
 			break;
 		case SQLAPI_PBE:
 			break;
-		case SQLAPI_STORE_PROC:
+		case SQLAPI_STOREPROC:
+			sbo = &storeproc_sqlapi_operation;
 			break;
 		default:
 			break;

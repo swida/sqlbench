@@ -27,7 +27,8 @@ int exiting = 0;
 
 int perform_integrity_check = 0;
 int no_thinktime = 0;
-
+/* use store procedure to test */
+int use_storeproc = 0;
 int parse_arguments(int argc, char *argv[]);
 
 int main(int argc, char *argv[])
@@ -40,7 +41,7 @@ int main(int argc, char *argv[])
 	init_driver();
 
 	if (parse_arguments(argc, argv) != OK) {
-		printf("usage: %s -t <dbms> -c # -w # -l # [-s #] [-e #] [-o p] [-z]",
+		printf("usage: %s -t <dbms> -c # -w # -l # [-r #] [-s #] [-e #] [-o p] [-z]",
 			argv[0]);
 		printf("\n");
 		printf("-t <dbms>\n");
@@ -50,17 +51,20 @@ int main(int argc, char *argv[])
 		printf("\tnumber of database connections\n");
 		printf("-w #\n");
 		printf("\twarehouse cardinality, default 1\n");
-		printf("-r #\n");
-		printf("\tthe duration of ramp up in seconds\n");
 		printf("-l #\n");
 		printf("\tthe duration of the run in seconds\n");
 		printf("\n");
+		printf("-r #\n");
+		printf("\tthe duration of ramp up in seconds\n");
 		printf("-s #\n");
 		printf("\tlower warehouse id, default 1\n");
 		printf("-e #\n");
 		printf("\tupper warehouse id, default <w>\n");
+		printf("-o p\n");
+		printf("\toutput directory of log files, default current directory\n");
 		printf("-z\n");
 		printf("\tperform database integrity check\n");
+		printf("\n");
 		printf("--customer #\n");
 		printf("\tcustomer cardinality, default %d\n", CUSTOMER_CARDINALITY);
 		printf("--item #\n");
@@ -110,7 +114,7 @@ int main(int argc, char *argv[])
 		printf("\tstock-level thinking time, default %d ms\n",
 				THINK_TIME_STOCK_LEVEL);
 		printf("--no-thinktime\n");
-		printf("no think time and keying time to every transaction\n");
+		printf("\tno think time and keying time to every transaction\n");
 		printf("\n");
 		printf("--tpw #\n");
 		printf("\tterminals started per warehouse, default 10\n");
@@ -121,7 +125,10 @@ int main(int argc, char *argv[])
 		printf("--altered #\n");
 		printf("\trun with a thread per user, and will start # threads\n");
 		printf("--sleep #\n");
-		printf("\tnumber of milliseconds to sleep between terminal creation or openning db connections\n");
+		printf("\tnumber of milliseconds to sleep between terminal creation, openning db connections\n");
+		printf("--storeproc\n");
+		printf("\trun test using store procedure interface\n");
+
 		return 1;
 	}
 
@@ -129,6 +136,19 @@ int main(int argc, char *argv[])
 		printf("cannot init driver\n");
 		return 1;
 	};
+
+	if(use_storeproc)
+	{
+		if(!dbc_manager_is_storeproc_supported())
+		{
+			printf("not support store procedure interface for %s\n", dbc_manager_get_name());
+			return 1;
+		}
+		set_sqlapi_operation(SQLAPI_STOREPROC);
+		printf("user store procedure interface\n");
+	}
+	else
+		set_sqlapi_operation(SQLAPI_SIMPLE);
 
 	create_pid_file();
 
@@ -260,8 +280,6 @@ int main(int argc, char *argv[])
 	printf("%d seconds steady state duration\n", duration);
 	printf("\n");
 
-	set_sqlapi_operation(SQLAPI_SIMPLE);
-
 	if (perform_integrity_check && integrity_terminal_worker() != OK) {
 	   printf("You used wrong parameters or something wrong with database.\n");
 	   return 1;
@@ -308,6 +326,7 @@ int parse_arguments(int argc, char *argv[])
 		{"sleep", required_argument, 0, 22},
 		{"seed",  required_argument, 0, 23},
 		{"altered", required_argument, 0, 24},
+		{"storeproc", no_argument, 0, 25},
 		{0, 0, 0, 0}
 	};
 
@@ -475,6 +494,9 @@ parse_dbc_type_done:
 		break;
 		case 24:
 			mode_altered = atoi(optarg);
+			break;
+		case 25:
+			use_storeproc = 1;
 			break;
 		case '?':
 			rc = ERROR;

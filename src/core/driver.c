@@ -298,7 +298,6 @@ int start_driver()
 	pthread_mutex_lock(&mutex_mix_log);
 	start_time = (int) time(NULL);
 	fprintf(log_mix, "0,RAMPUP,,,%d\n", start_time);
-	fflush(log_mix);
 	pthread_mutex_unlock(&mutex_mix_log);
 	for (i = 0; i < thread_count; i++) {
 		int ret;
@@ -354,7 +353,6 @@ int start_driver()
 	/* Note that the driver has started up all threads in the log. */
 	pthread_mutex_lock(&mutex_mix_log);
 	fprintf(log_mix, "%d,START,,,\n", (int) time(NULL) - start_time);
-	fflush(log_mix);
 	pthread_mutex_unlock(&mutex_mix_log);
 
 	/* wait until all threads quit */
@@ -383,7 +381,6 @@ void log_transaction_mix(int transaction, char code, double response_time, unsig
 	pthread_mutex_lock(&mutex_mix_log);
 	fprintf(log_mix, "%d,%c,%c,%f,%d\n", (int) (time(NULL) - start_time),
 			transaction_short_name[transaction], code, response_time, term_id);
-	fflush(log_mix);
 	pthread_mutex_unlock(&mutex_mix_log);
 }
 
@@ -485,7 +482,6 @@ void *terminals_worker(void *data)
 	/* Note when each thread has exited. */
 	pthread_mutex_lock(&mutex_mix_log);
 	fprintf(log_mix, "%d,TERMINATED,,,%d-%d\n", (int) (time(NULL) - start_time), tc->start_term, tc->end_term);
-	fflush(log_mix);
 	pthread_mutex_unlock(&mutex_mix_log);
 
 	return NULL; /* keep the compiler quiet */

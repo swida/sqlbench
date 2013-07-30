@@ -48,15 +48,16 @@ void enqueue_terminal(int termworker_id, int term)
 	int mean_think_time; /* In milliseconds. */
 	unsigned int running_time;
 	int low, high;
+
 	struct terminal_queue_t *term_queue =
 		&termworker_context[termworker_id].term_queue;
 	struct terminal_t *terms = term_queue->terminals;
 
 	transaction = generate_transaction(&keying_time, &mean_think_time);
 
-	pthread_mutex_lock(&term_queue->queue_mutex);
 	running_time = keying_time * 1000 + get_think_time(mean_think_time) + term_queue->timing;
 
+	pthread_mutex_lock(&term_queue->queue_mutex);
 	/* find insert pos */
 	low = 0;
 	high = term_queue->length;

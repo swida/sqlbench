@@ -19,7 +19,7 @@ enum sqlapi_type
 {
 	SQLAPI_SIMPLE,
 	SQLAPI_PBE,
-	SQLAPI_STORE_PROC
+	SQLAPI_STOREPROC
 };
 
 struct db_context_t {

@@ -15,20 +15,12 @@
 #include "transaction_data.h"
 #include "dbc.h"
 #include "common.h"
-
-#include <libpq-fe.h>
+#include "dbc_pgsql.h"
 
 static char dbname[32] = "dbt2";
 static char pghost[32] = "localhost";
 static char pgport[32] = "5432";
 static char pguser[32] = "dbt2";
-
-struct pgsql_context_t
-{
-	struct db_context_t base;
-	PGconn *conn;
-	int inTransaction;
-};
 
 static int
 pgsql_commit_transaction(struct db_context_t *_dbc)
@@ -258,6 +250,8 @@ struct dbc_sql_operation_t pgsql_sql_operation =
 	pgsql_sql_getvalue
 };
 
+extern struct dbc_storeproc_operation_t pgsql_storeproc_operation;
+
 int
 pgsql_dbc_init()
 {
@@ -267,6 +261,7 @@ pgsql_dbc_init()
 	pgsql_info->is_forupdate_supported = 0;
 
 	pgsql_info->dbc_sql_operation = &pgsql_sql_operation;
+	pgsql_info->dbc_storeproc_operation = &pgsql_storeproc_operation;
 	pgsql_info->dbc_get_options = pgsql_dbc_get_options;
 	pgsql_info->dbc_set_option = pgsql_dbc_set_option;
 	dbc_manager_add(pgsql_info);

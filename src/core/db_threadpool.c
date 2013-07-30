@@ -199,7 +199,7 @@ int db_threadpool_init()
 
                 /* Keep a count of how many DB worker threads have started. */
                 sem_post(&db_worker_count);
-				if ((i + 1) % 5 == 0) {
+				if ((i + 1) % 20 == 0) {
 					printf("%d / %d db connections opened...\n", i + 1, db_connections);
 					fflush(stdout);
 				}
