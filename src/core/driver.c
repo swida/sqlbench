@@ -354,7 +354,7 @@ int start_driver()
 	pthread_mutex_lock(&mutex_mix_log);
 	fprintf(log_mix, "%d,START,,,\n", (int) time(NULL) - start_time);
 	pthread_mutex_unlock(&mutex_mix_log);
-
+	printf("steady status started...\n");
 	/* wait until all threads quit */
 	for (i = 0; i < thread_count; i++) {
 		if (pthread_join(tids[i], NULL) != 0) {
@@ -402,9 +402,7 @@ void *terminals_worker(void *data)
 
 		local_seed = pid;
 		gettimeofday(&tv, NULL);
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 		local_seed ^=  tid ^ tv.tv_sec ^ tv.tv_usec ^ junk;
-#pragma GCC diagnostic warning "-Wmaybe-uninitialized"
 	} else {
 		local_seed = seed;
 	}

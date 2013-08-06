@@ -10,12 +10,11 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "db.h"
+#include "dbc_pgsql.h"
 #include "logging.h"
 #include "transaction_data.h"
 #include "dbc.h"
 #include "common.h"
-#include "dbc_pgsql.h"
 
 static char dbname[32] = "dbt2";
 static char pghost[32] = "localhost";

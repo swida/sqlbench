@@ -64,9 +64,7 @@ void *db_worker(void *data)
 
 		local_seed = pid;
 		gettimeofday(&tv, NULL);
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 		local_seed ^=  tid ^ tv.tv_sec ^ tv.tv_usec ^ junk;
-#pragma GCC diagnostic warning "-Wmaybe-uninitialized"
 	} else {
 		local_seed = seed;
 	}

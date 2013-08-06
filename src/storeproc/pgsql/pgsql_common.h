@@ -1,7 +1,7 @@
 #ifndef PGSQL_COMMON_H
 #define PGSQL_COMMON_H
 #include "transaction_data.h"
-#include "../../dbc/pgsql/dbc_pgsql.h"
+#include "db.h"
 extern int pgsql_sp_integrity(struct db_context_t *dbc, struct integrity_t *data);
 extern int pgsql_sp_delivery(struct db_context_t *dbc, struct delivery_t *data);
 extern int pgsql_sp_new_order(struct db_context_t *dbc, struct new_order_t *data);
