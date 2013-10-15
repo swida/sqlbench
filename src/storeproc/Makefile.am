@@ -1,1 +1,1 @@
-SUBDIRS = pgsql
+SUBDIRS = pgsql kingbase

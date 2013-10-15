@@ -66,6 +66,8 @@ AC_CONFIG_FILES(
 	src/storeproc/pgsql/Makefile
 	src/storeproc/pgsql/c/Makefile
 	src/storeproc/pgsql/plpgsql/Makefile
+	src/storeproc/kingbase/Makefile
+	src/storeproc/kingbase/plsql/Makefile
 	src/utils/Makefile
 	src/include/Makefile])
 AC_OUTPUT

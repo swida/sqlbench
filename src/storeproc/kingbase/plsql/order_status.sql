@@ -6,7 +6,8 @@
  *
  * Based on TPC-C Standard Specification Revision 5.0 Clause 2.6.2.
  */
-CREATE OR REPLACE FUNCTION order_status (INTEGER, INTEGER, INTEGER, TEXT) RETURNS SETOF record AS '
+\set SQLTERM @
+CREATE OR REPLACE FUNCTION order_status (INTEGER, INTEGER, INTEGER, TEXT) RETURNS SETOF record AS
 DECLARE
 	in_c_id ALIAS FOR $1;
 	in_c_w_id ALIAS FOR $2;
@@ -72,4 +73,5 @@ BEGIN
 
 	RETURN;
 END;
-' LANGUAGE 'plpgsql';
+@
+\set SQLTERM ;
