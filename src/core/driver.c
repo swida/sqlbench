@@ -295,10 +295,11 @@ int start_driver()
 	/* allocate g_tid */
 	tids = malloc(sizeof(pthread_t) * thread_count);
 	init_termworker_array(thread_count);
-	pthread_mutex_lock(&mutex_mix_log);
 	start_time = (int) time(NULL);
+	pthread_mutex_lock(&mutex_mix_log);
 	fprintf(log_mix, "0,RAMPUP,,,%d\n", start_time);
 	pthread_mutex_unlock(&mutex_mix_log);
+	fflush(log_mix);
 	for (i = 0; i < thread_count; i++) {
 		int ret;
 		pthread_attr_t attr;
@@ -354,6 +355,7 @@ int start_driver()
 	pthread_mutex_lock(&mutex_mix_log);
 	fprintf(log_mix, "%d,START,,,\n", (int) time(NULL) - start_time);
 	pthread_mutex_unlock(&mutex_mix_log);
+	fflush(log_mix);
 	printf("steady status started...\n");
 	/* wait until all threads quit */
 	for (i = 0; i < thread_count; i++) {
@@ -382,6 +384,7 @@ void log_transaction_mix(int transaction, char code, double response_time, unsig
 	fprintf(log_mix, "%d,%c,%c,%f,%d\n", (int) (time(NULL) - start_time),
 			transaction_short_name[transaction], code, response_time, term_id);
 	pthread_mutex_unlock(&mutex_mix_log);
+	fflush(log_mix);
 }
 
 void *terminals_worker(void *data)
@@ -481,6 +484,6 @@ void *terminals_worker(void *data)
 	pthread_mutex_lock(&mutex_mix_log);
 	fprintf(log_mix, "%d,TERMINATED,,,%d-%d\n", (int) (time(NULL) - start_time), tc->start_term, tc->end_term);
 	pthread_mutex_unlock(&mutex_mix_log);
-
+	fflush(log_mix);
 	return NULL; /* keep the compiler quiet */
 }
