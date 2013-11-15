@@ -27,3 +27,4 @@ Makefile.in
 /src/core/sqlbench
 /src/core/transaction_test
 /src/core/datagen
+/src/utils/post_process
