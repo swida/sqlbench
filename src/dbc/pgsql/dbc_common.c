@@ -142,6 +142,64 @@ pgsql_sql_execute(struct db_context_t *_dbc, char * query, struct sql_result_t *
 }
 
 static int
+pgsql_sql_prepare(struct db_context_t *_dbc,  char *query, char *query_name)
+{
+	struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
+
+	PGresult *res = PQprepare(dbc->conn, query_name, query, 0, NULL);
+	if (!res || PQresultStatus(res) != PGRES_COMMAND_OK) {
+		LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
+		PQclear(res);
+		return ERROR;
+	}
+
+	PQclear(res);
+	return OK;
+}
+
+static int
+pgsql_sql_execute_prepared(
+	struct db_context_t *_dbc,
+	char **params, int num_params, struct sql_result_t * sql_result,
+	char * query_name)
+{
+	struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
+	PGresult *res;
+
+	if (!dbc->inTransaction)
+	{
+		/* Start a transaction block. */
+		res = PQexec(dbc->conn, "BEGIN");
+		if (!res || PQresultStatus(res) != PGRES_COMMAND_OK) {
+			LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
+			PQclear(res);
+			return ERROR;
+		}
+
+		PQclear(res);
+		dbc->inTransaction = 1;
+	}
+	res = PQexecPrepared(dbc->conn, query_name, num_params, (const char * const *)params, NULL, NULL, 0);
+	if (!res || (PQresultStatus(res) != PGRES_COMMAND_OK &&
+				 PQresultStatus(res) != PGRES_TUPLES_OK)) {
+		LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
+		PQclear(res);
+		return ERROR;
+	}
+
+	if(sql_result == NULL)
+		PQclear(res);
+	else
+	{
+		sql_result->result_set = res;
+		sql_result->current_row = -1;
+		sql_result->num_rows = PQntuples(res);
+	}
+
+	return OK;
+}
+
+static int
 pgsql_sql_fetchrow(struct db_context_t *_dbc, struct sql_result_t * sql_result)
 {
 	PGresult *res = (PGresult *)sql_result->result_set;
@@ -244,6 +302,8 @@ struct dbc_sql_operation_t pgsql_sql_operation =
 	pgsql_commit_transaction,
 	pgsql_rollback_transaction,
 	pgsql_sql_execute,
+	pgsql_sql_prepare,
+	pgsql_sql_execute_prepared,
 	pgsql_sql_fetchrow,
 	pgsql_sql_close_cursor,
 	pgsql_sql_getvalue

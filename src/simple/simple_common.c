@@ -53,6 +53,16 @@ int dbt2_init_values(char ** values, int max_values)
 	return 1;
 }
 
+int dbt2_init_params(char ** values, int max_values, int max_length)
+{
+	int i;
+
+	for (i=0; i<max_values; i++) {
+		values[i]= malloc(max_length);
+	}
+	return 1;
+}
+
 int dbt2_free_values(char ** values, int max_values)
 {
 	int i;

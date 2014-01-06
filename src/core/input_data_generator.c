@@ -41,7 +41,7 @@ int generate_input_data(int type, void *data, int w_id)
 	case PAYMENT:
 		generate_payment_data(w_id, (struct payment_t *) data);
 		break;
-        case INTEGRITY:
+	case INTEGRITY:
                 generate_integrity_data(w_id, (struct integrity_t *) data);
 	default:
 		return ERROR;

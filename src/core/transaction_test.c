@@ -28,6 +28,7 @@ int main(int argc, char *argv[])
 	int transaction = -1;
 	struct db_context_t *dbc;
 	union transaction_data_t transaction_data;
+	enum sqlapi_type use_sqlapi_type = SQLAPI_SIMPLE;
 
 	int c;
 	char dbms_name[16] = "";
@@ -44,9 +45,14 @@ int main(int argc, char *argv[])
 		printf("-t <dbms>\n");
 		printf("\tavailable:%s\n", dbc_manager_get_dbcnames());
 		printf("%s", dbc_manager_get_dbcusages());
-		printf("-T (d|n|o|p|s)\n");
+		printf("-I interface\n");
+		printf("\trun test using sql interface, available:\n");
+		printf("\tsimple      default, just send sql statement to database\n");
+		printf("\textended    use extended (prepare/bind/execute) protocol, better than simple\n");
+		printf("\tstoreproc   use store procedure\n");
+		printf("-T (d|n|o|p|s|i)\n");
 		printf("\td = Delivery, n = New-Order, o = Order-Status,\n");
-		printf("\tp = Payment, s = Stock-Level\n");
+		printf("\tp = Payment, s = Stock-Level, i = Integrity\n");
 		printf("-w #\n");
 		printf("\tnumber of warehouses, default 1\n");
 		printf("-c #\n");
@@ -58,7 +64,7 @@ int main(int argc, char *argv[])
 		printf("\torder cardinality, default %d\n", ORDER_CARDINALITY);
 		printf("-n #\n");
 		printf("\tnew-order cardinality, default %d\n",
-			NEW_ORDER_CARDINALITY);
+			   NEW_ORDER_CARDINALITY);
 		return 1;
 	}
 
@@ -78,10 +84,12 @@ int main(int argc, char *argv[])
 		switch (c) {
 		case 't':
 			strncpy(dbms_name, optarg, sizeof(dbms_name));
+			goto parse_dbc_type_done;
 			break;
 		}
 	}
 
+parse_dbc_type_done:
 	if(dbms_name[0] == '\0' || dbc_manager_set(dbms_name) != OK)
 		return ERROR;
 
@@ -92,12 +100,13 @@ int main(int argc, char *argv[])
 	opterr = 1;
 	while (1) {
 		int option_index = 0;
-		c = getopt_long(argc, argv, "c:i:n:o:t:T:w:",
+		c = getopt_long(argc, argv, "c:i:I:n:o:t:T:w:",
 			dbms_long_options, &option_index);
 		if (c == -1) {
+			printf("unkown option\n");
+			printf("Try \"%s --help\" for more information.\n", argv[0]);
 			break;
 		}
-
 		switch (c) {
 		case 0:
 			if(dbc_manager_set_dbcoption(dbms_long_options[option_index].name, optarg) == ERROR)
@@ -114,6 +123,8 @@ int main(int argc, char *argv[])
 				transaction = PAYMENT;
 			else if (optarg[0] == 's') 
 				transaction = STOCK_LEVEL;
+			else if (optarg[0] == 'i')
+				transaction = INTEGRITY;
 			else {
 				printf("unknown transaction: %s\n", optarg);
 				return 3;
@@ -128,6 +139,19 @@ int main(int argc, char *argv[])
 			case 'i':
 			table_cardinality.items = atoi(optarg);
 			break;
+			case 'I':
+				if (strcasecmp(optarg, "simple") == 0)
+					use_sqlapi_type = SQLAPI_SIMPLE;
+				else if (strcasecmp(optarg, "extended") == 0)
+					use_sqlapi_type = SQLAPI_EXTENDED;
+				else if (strcasecmp(optarg, "storeproc") == 0)
+					use_sqlapi_type = SQLAPI_STOREPROC;
+				else
+				{
+					printf("unknown sql interface: %s\n", optarg);
+					return 3;
+				}
+				break;
 			case 'o':
 			table_cardinality.orders = atoi(optarg);
 			break;
@@ -147,7 +171,7 @@ int main(int argc, char *argv[])
 		return 5;
 	}
 
-	set_sqlapi_operation(SQLAPI_SIMPLE);
+	set_sqlapi_operation(use_sqlapi_type);
 
 	/* Double check database table cardinality. */
 	printf("\n");
@@ -189,7 +213,10 @@ int main(int argc, char *argv[])
 		generate_input_data2(STOCK_LEVEL,
 			(void *) &transaction_data.stock_level,
 			get_random(table_cardinality.warehouses) + 1,
-			get_random(table_cardinality.districts) + 1);
+							 get_random(table_cardinality.districts) + 1);
+	case INTEGRITY:
+		generate_input_data(INTEGRITY,
+							&transaction_data.integrity, table_cardinality.warehouses);
 		break;
 	}
 

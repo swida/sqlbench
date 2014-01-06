@@ -28,7 +28,7 @@ int exiting = 0;
 int perform_integrity_check = 0;
 int no_thinktime = 0;
 /* use store procedure to test */
-int use_storeproc = 0;
+enum sqlapi_type use_sqlapi_type = SQLAPI_SIMPLE;
 int parse_arguments(int argc, char *argv[]);
 
 int main(int argc, char *argv[])
@@ -126,9 +126,11 @@ int main(int argc, char *argv[])
 		printf("\trun with a thread per user, and will start # threads\n");
 		printf("--sleep #\n");
 		printf("\tnumber of milliseconds to sleep between terminal creation, openning db connections\n");
-		printf("--storeproc\n");
-		printf("\trun test using store procedure interface\n");
-
+		printf("--sqlapi\n");
+		printf("\trun test using sql interface, available:\n");
+		printf("\tsimple      default, just send sql statement to database\n");
+		printf("\textended    use extended (prepare/bind/execute) protocol, better than simple\n");
+		printf("\tstoreproc   use store procedure\n");
 		return 1;
 	}
 
@@ -137,18 +139,17 @@ int main(int argc, char *argv[])
 		return 1;
 	};
 
-	if(use_storeproc)
+	if(use_sqlapi_type == SQLAPI_STOREPROC)
 	{
 		if(!dbc_manager_is_storeproc_supported())
 		{
 			printf("not support store procedure interface for %s\n", dbc_manager_get_name());
 			return 1;
 		}
-		set_sqlapi_operation(SQLAPI_STOREPROC);
-		printf("user store procedure interface\n");
-	}
-	else
-		set_sqlapi_operation(SQLAPI_SIMPLE);
+		printf("use store procedure interface\n");
+	}else if(use_sqlapi_type == SQLAPI_EXTENDED)
+		printf("use extended sql interface\n");
+	set_sqlapi_operation(use_sqlapi_type);
 
 	create_pid_file();
 
@@ -326,7 +327,7 @@ int parse_arguments(int argc, char *argv[])
 		{"sleep", required_argument, 0, 22},
 		{"seed",  required_argument, 0, 23},
 		{"altered", required_argument, 0, 24},
-		{"storeproc", no_argument, 0, 25},
+		{"sqlapi", required_argument, 0, 25},
 		{0, 0, 0, 0}
 	};
 
@@ -496,7 +497,17 @@ parse_dbc_type_done:
 			mode_altered = atoi(optarg);
 			break;
 		case 25:
-			use_storeproc = 1;
+			if (strcasecmp(optarg, "simple") == 0)
+				use_sqlapi_type = SQLAPI_SIMPLE;
+			else if (strcasecmp(optarg, "extended") == 0)
+				use_sqlapi_type = SQLAPI_EXTENDED;
+			else if (strcasecmp(optarg, "storeproc") == 0)
+				use_sqlapi_type = SQLAPI_STOREPROC;
+			else
+			{
+				rc = ERROR;
+				goto _end;
+			}
 			break;
 		case '?':
 			rc = ERROR;

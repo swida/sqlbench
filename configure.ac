@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([sqlbench], [0.4.2], [dianchengwang@gmail.com])
+AC_INIT([sqlbench], [0.5.0], [dianchengwang@gmail.com])
 AM_INIT_AUTOMAKE([silent-rules])
 AC_CONFIG_SRCDIR([src/core/driver.c])
 AC_CONFIG_HEADERS([config.h])
@@ -62,6 +62,7 @@ AC_CONFIG_FILES(
 	src/dbc/Makefile
 	src/dbc/pgsql/Makefile
 	src/simple/Makefile
+	src/extended/Makefile
 	src/storeproc/Makefile
 	src/storeproc/pgsql/Makefile
 	src/storeproc/pgsql/c/Makefile

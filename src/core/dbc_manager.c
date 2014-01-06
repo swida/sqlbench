@@ -182,6 +182,25 @@ dbc_sql_execute(struct db_context_t *dbc, char * query, struct sql_result_t * sq
 }
 
 int
+dbc_sql_prepare(struct db_context_t *dbc,  char *query, char *query_name)
+{
+	assert(_dbc_info);
+	struct dbc_sql_operation_t *sop = _dbc_info->dbc_sql_operation;
+	return (*(sop->sql_prepare))(dbc, query, query_name);
+}
+
+int
+dbc_sql_execute_prepared(
+	struct db_context_t *dbc,
+	char **params, int num_params, struct sql_result_t * sql_result,
+	char * query_name)
+{
+	assert(_dbc_info);
+	struct dbc_sql_operation_t *sop = _dbc_info->dbc_sql_operation;
+	return (*(sop->sql_execute_prepared))(dbc, params, num_params, sql_result, query_name);
+}
+
+int
 dbc_sql_fetchrow(struct db_context_t *dbc, struct sql_result_t * sql_result)
 {
 	assert(_dbc_info);

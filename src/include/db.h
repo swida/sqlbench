@@ -18,7 +18,7 @@
 enum sqlapi_type
 {
 	SQLAPI_SIMPLE,
-	SQLAPI_PBE,
+	SQLAPI_EXTENDED,
 	SQLAPI_STOREPROC
 };
 

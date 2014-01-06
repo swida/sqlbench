@@ -12,6 +12,10 @@ struct dbc_sql_operation_t
 	int (*rollback_transaction)(struct db_context_t *dbc);
 	int (*sql_execute)(struct db_context_t *dbc, char * query, struct sql_result_t * sql_result,
                        char * query_name);
+	int (*sql_prepare) (struct db_context_t *dbc,  char *query, char *query_name);
+	int (*sql_execute_prepared)(struct db_context_t *dbc,
+								char **params, int num_params, struct sql_result_t * sql_result,
+							   char * query_name);
 	int (*sql_fetchrow)(struct db_context_t *dbc, struct sql_result_t * sql_result);
 	int (*sql_close_cursor)(struct db_context_t *dbc, struct sql_result_t * sql_result);
 	char *(*sql_getvalue)(struct db_context_t *dbc, struct sql_result_t * sql_result, int field);
@@ -64,7 +68,12 @@ extern int dbc_disconnect_from_db(struct db_context_t *dbc);
 extern int dbc_commit_transaction(struct db_context_t *dbc);
 extern int dbc_rollback_transaction(struct db_context_t *dbc);
 extern int dbc_sql_execute(struct db_context_t *dbc, char * query, struct sql_result_t * sql_result,
- 					char * query_name);
+						   char * query_name);
+extern int dbc_sql_prepare(struct db_context_t *dbc,  char *query, char *query_name);
+extern int dbc_sql_execute_prepared(
+	struct db_context_t *dbc,
+	char **params, int num_params, struct sql_result_t * sql_result,
+	char * query_name);
 extern int dbc_sql_fetchrow(struct db_context_t *dbc, struct sql_result_t * sql_result);
 extern int dbc_sql_close_cursor(struct db_context_t *dbc, struct sql_result_t * sql_result);
 extern char * dbc_sql_getvalue(struct db_context_t *dbc, struct sql_result_t * sql_result, int field);
