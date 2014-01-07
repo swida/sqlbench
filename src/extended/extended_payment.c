@@ -98,8 +98,6 @@ payment(struct db_context_t *dbc, struct payment_t *data, char ** vals, int  nva
 	char query_data[64];
 
 	int my_c_id = 0;
-	char my_w_name[20];
-	char my_d_name[20];
 	int num_params;
 
 	dbt2_init_values(vals, nvals);
@@ -296,8 +294,7 @@ payment(struct db_context_t *dbc, struct payment_t *data, char ** vals, int  nva
 		char my_c_data[1000];
 		sprintf(my_c_data, "%d %d %d %d %d %f ", my_c_id, c_d_id,
 				c_w_id, d_id, w_id, h_amount);
-		/* Copy and escape all at once! */
-		dbt2_escape_str(vals[C_DATA], my_c_data);
+		my_c_data[500] = '\0';
 		sprintf(params[0], "%f", h_amount);
 		params[1] = my_c_data;
 		sprintf(params[2], "%d", my_c_id);
@@ -325,10 +322,8 @@ payment(struct db_context_t *dbc, struct payment_t *data, char ** vals, int  nva
 	sprintf(params[4], "%d", w_id);
 	sprintf(params[5], "%f", h_amount);
 	/* Escape special characters. */
-	dbt2_escape_str(vals[W_NAME], my_w_name);
-	dbt2_escape_str(vals[D_NAME], my_d_name);
 
-	sprintf(query_data, "%s %s", my_w_name, my_d_name);
+	sprintf(query_data, "%s %s", vals[W_NAME], vals[D_NAME]);
 	params[6] = query_data;
 	num_params = 7;
 
@@ -336,7 +331,7 @@ payment(struct db_context_t *dbc, struct payment_t *data, char ** vals, int  nva
 	LOG_ERROR_MESSAGE(
 		"%s query: %s, $1 = %d, $2 = %d, $3 = %d, $4 = %d, $5 = %d, $6 = %f, $7 = '%s %s'\n",
 		N_PAYMENT_8, PAYMENT_8, my_c_id, c_d_id, c_w_id, d_id, w_id,
-		h_amount, my_w_name, my_d_name);
+		h_amount, vals[W_NAME], vals[D_NAME]);
 #endif
 
 	if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, N_PAYMENT_8))

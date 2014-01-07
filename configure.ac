@@ -39,6 +39,27 @@ AC_ARG_WITH(pgsql,
 AC_SUBST(PGSQL_INCLUDE_DIR)
 AC_SUBST(PGSQL_LIB_DIR)
 
+kingbase=no
+AC_ARG_WITH(kingbase,
+    [  --with-kingbase=DIR     site header files for Kingbase in DIR],
+    [
+        case "$withval" in
+        y | ye | yes)
+            AC_MSG_ERROR([*** You must supply an argument to the --with-kingbase option.])
+          ;;
+        esac
+	kingbase=yes
+        KINGBASE_INCLUDE_DIR="$withval"/include
+        KINGBASE_LIBS=-L"${withval}/lib -lkci"
+	AC_SUBST(KINGBASE_INCLUDE_DIR)
+	AC_SUBST(KINGBASE_LIBS)
+    ])
+
+AM_CONDITIONAL([ENABLE_KINGBASE], [test x$kingbase = xyes])
+if test x$kingbase = xyes
+then
+	AC_DEFINE(ENABLE_KINGBASE, 1, [enable kingbase support.])
+fi
 # Checks for libraries.
 AC_CHECK_LIB([m], [pow])
 
@@ -71,4 +92,10 @@ AC_CONFIG_FILES(
 	src/storeproc/kingbase/plsql/Makefile
 	src/utils/Makefile
 	src/include/Makefile])
+
+if test x$kingbase = xyes
+then
+	AC_CONFIG_FILES(src/dbc/kingbase/Makefile)
+fi
+
 AC_OUTPUT

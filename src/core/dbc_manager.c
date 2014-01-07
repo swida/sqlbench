@@ -1,12 +1,19 @@
+#include "config.h"
 #include "dbc.h"
 #include "common.h"
 #include <string.h>
 
-extern int pgsql_dbc_init();
 
+extern int pgsql_dbc_init();
+#ifdef ENABLE_KINGBASE
+extern int kingbase_dbc_init();
+#endif if
 struct dbc_construct_t dbc_constructs[] =
 {
 	{pgsql_dbc_init},
+#ifdef ENABLE_KINGBASE
+	{kingbase_dbc_init},
+#endif
 	{NULL},
 };
 

@@ -17,7 +17,7 @@
 #include "common.h"
 
 static char dbname[32] = "dbt2";
-static char pghost[32] = "localhost";
+static char pghost[32] = "";
 static char pgport[32] = "5432";
 static char pguser[32] = "dbt2";
 
@@ -47,13 +47,11 @@ pgsql_connect_to_db(struct db_context_t *_dbc)
 {
 		struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
         char buf[1024];
+		char host_option[256] = "";
 
-        if(strcmp(pghost, "localhost") == 0 &&
-           strcmp(pgport, "5432") == 0) {
-			sprintf(buf, "dbname=%s user=%s", dbname, pguser);
-        } else {
-			sprintf(buf, "host=%s port=%s dbname=%s user=%s", pghost, pgport, dbname, pguser);
-        }
+        if(*pghost != '\0')
+			snprintf(host_option, sizeof(host_option), "host=%s", pghost);
+		sprintf(buf, "%s port=%s dbname=%s user=%s", host_option, pgport, dbname, pguser);
         dbc->conn = PQconnectdb(buf);
         if (PQstatus(dbc->conn) != CONNECTION_OK) {
                 LOG_ERROR_MESSAGE("Connection to database '%s' failed.",

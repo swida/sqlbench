@@ -10,7 +10,7 @@
 #include "extended_delivery.h"
 
 static __thread int delivery_initialized = 0;
-static 	char *params[4];
+static __thread char *params[4];
 
 static int
 delivery(struct db_context_t *dbc, struct delivery_t *data, char ** vals, int nvals);
