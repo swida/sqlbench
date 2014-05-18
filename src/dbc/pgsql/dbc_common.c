@@ -16,10 +16,10 @@
 #include "dbc.h"
 #include "common.h"
 
-static char dbname[32] = "dbt2";
-static char pghost[32] = "";
-static char pgport[32] = "5432";
-static char pguser[32] = "dbt2";
+static char dbname[128] = "";
+static char pghost[128] = "";
+static char pgport[32] = "";
+static char pguser[128] = "";
 
 static int
 pgsql_commit_transaction(struct db_context_t *_dbc)
@@ -47,11 +47,30 @@ pgsql_connect_to_db(struct db_context_t *_dbc)
 {
 		struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
         char buf[1024];
-		char host_option[256] = "";
+		int index = 0;
 
-        if(*pghost != '\0')
-			snprintf(host_option, sizeof(host_option), "host=%s", pghost);
-		sprintf(buf, "%s port=%s dbname=%s user=%s", host_option, pgport, dbname, pguser);
+		/* speical case: dbname is conninfo string */
+		if (*dbname != '\0' && strchr(dbname, '=') != NULL)
+		{
+			dbc->conn = PQconnectdb(dbname);
+			if (PQstatus(dbc->conn) != CONNECTION_OK) {
+				LOG_ERROR_MESSAGE("using conninfo string '%s' connect to database failed.", dbname);
+				LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
+				PQfinish(dbc->conn);
+				return ERROR;
+			}
+			return OK;
+		}
+
+		if (*dbname != '\0')
+			index += snprintf(buf + index, sizeof(buf) - index, "dbname=%s ", dbname);
+        if (*pghost != '\0')
+			index += snprintf(buf + index, sizeof(buf) - index, "host=%s ", pghost);
+		if (*pgport != '\0')
+			index += snprintf(buf + index, sizeof(buf) - index, "port=%s ", pgport);
+		if (*pguser != '\0')
+			index += snprintf(buf + index, sizeof(buf) - index, "user=%s ", pguser);
+
         dbc->conn = PQconnectdb(buf);
         if (PQstatus(dbc->conn) != CONNECTION_OK) {
                 LOG_ERROR_MESSAGE("Connection to database '%s' failed.",
@@ -271,11 +290,11 @@ pgsql_dbc_get_options()
 static int
 pgsql_dbc_set_option(const char *optname, const char *optvalue)
 {
-	if(strncmp(optname, "dbname", 32) == 0 && optvalue != NULL)
-		strncpy(dbname, optvalue, 32);
-	else if(strncmp(optname, "host", 32) == 0 && optvalue != NULL)
-		strncpy(pghost, optvalue, 32);
-	else if(strncmp(optname, "port", 32) == 0 && optvalue != NULL)
+	if(strcmp(optname, "dbname") == 0 && optvalue != NULL)
+		strncpy(dbname, optvalue, sizeof(dbname));
+	else if(strcmp(optname, "host") == 0 && optvalue != NULL)
+		strncpy(pghost, optvalue, sizeof(pghost));
+	else if(strcmp(optname, "port") == 0 && optvalue != NULL)
 	{
 		/* check port */
 		int port = atoi(optvalue);
@@ -285,10 +304,10 @@ pgsql_dbc_set_option(const char *optname, const char *optvalue)
 			printf("invalid port number: %s\n", optvalue);
 			return ERROR;
 		}
-		strncpy(pgport, optvalue, 32);
+		strncpy(pgport, optvalue, sizeof(pgport));
 	}
-	else if(strncmp(optname, "user", 32) == 0 && optvalue != NULL)
-		strncpy(pguser, optvalue, 32);
+	else if(strcmp(optname, "user") == 0 && optvalue != NULL)
+		strncpy(pguser, optvalue, sizeof(pguser));
 	return OK;
 }
 
