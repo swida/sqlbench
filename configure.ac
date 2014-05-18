@@ -82,6 +82,7 @@ AC_CONFIG_FILES(
 	src/core/Makefile
 	src/dbc/Makefile
 	src/dbc/pgsql/Makefile
+	src/dbc/kingbase/Makefile
 	src/simple/Makefile
 	src/extended/Makefile
 	src/storeproc/Makefile
@@ -92,10 +93,4 @@ AC_CONFIG_FILES(
 	src/storeproc/kingbase/plsql/Makefile
 	src/utils/Makefile
 	src/include/Makefile])
-
-if test x$kingbase = xyes
-then
-	AC_CONFIG_FILES(src/dbc/kingbase/Makefile)
-fi
-
 AC_OUTPUT
