@@ -16,10 +16,12 @@
 #include "dbc.h"
 #include "common.h"
 
-static char dbname[128] = "";
-static char pghost[128] = "";
+static char dbname[16][128] = {""};
 static char pgport[32] = "";
 static char pguser[128] = "";
+static char pghost[128] = "";
+static int dbname_count = 0;
+static int last_dbname_connected = 0;
 
 static int
 pgsql_commit_transaction(struct db_context_t *_dbc)
@@ -50,9 +52,13 @@ pgsql_connect_to_db(struct db_context_t *_dbc)
 		int index = 0;
 
 		/* speical case: dbname is conninfo string */
-		if (*dbname != '\0' && strchr(dbname, '=') != NULL)
+		if (dbname[0] != '\0' && strchr(dbname[0], '=') != NULL)
 		{
-			dbc->conn = PQconnectdb(dbname);
+			/* just conninfo string case support connect to multi-instance
+			 * database */
+			dbc->conn = PQconnectdb(dbname[last_dbname_connected++]);
+			if (last_dbname_connected >= dbname_count)
+				last_dbname_connected = 0;
 			if (PQstatus(dbc->conn) != CONNECTION_OK) {
 				LOG_ERROR_MESSAGE("using conninfo string '%s' connect to database failed.", dbname);
 				LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
@@ -62,8 +68,8 @@ pgsql_connect_to_db(struct db_context_t *_dbc)
 			return OK;
 		}
 
-		if (*dbname != '\0')
-			index += snprintf(buf + index, sizeof(buf) - index, "dbname=%s ", dbname);
+		if (*dbname[0] != '\0')
+			index += snprintf(buf + index, sizeof(buf) - index, "dbname=%s ", dbname[0]);
         if (*pghost != '\0')
 			index += snprintf(buf + index, sizeof(buf) - index, "host=%s ", pghost);
 		if (*pgport != '\0')
@@ -290,8 +296,9 @@ pgsql_dbc_get_options()
 static int
 pgsql_dbc_set_option(const char *optname, const char *optvalue)
 {
-	if(strcmp(optname, "dbname") == 0 && optvalue != NULL)
-		strncpy(dbname, optvalue, sizeof(dbname));
+	if(strcmp(optname, "dbname") == 0 && optvalue != NULL &&
+	   dbname_count < sizeof(dbname) / sizeof(dbname[0]))
+		strncpy(dbname[dbname_count++], optvalue, sizeof(dbname));
 	else if(strcmp(optname, "host") == 0 && optvalue != NULL)
 		strncpy(pghost, optvalue, sizeof(pghost));
 	else if(strcmp(optname, "port") == 0 && optvalue != NULL)
