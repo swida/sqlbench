@@ -23,6 +23,36 @@
 #include "transaction_data.h"
 #include "dbc.h"
 int mode_altered = 0;
+void
+usage(const char *progname)
+{
+	printf("usage: %s -t <dbms> -T d/n/o/p/s [-I interface] [-w #] [-T #]", progname);
+	printf("\n");
+	printf("-t <dbms>\n");
+	printf("\tavailable:%s\n", dbc_manager_get_dbcnames());
+	printf("%s", dbc_manager_get_dbcusages());
+	printf("-I interface\n");
+	printf("\trun test using sql interface, available:\n");
+	printf("\tsimple      default, just send sql statement to database\n");
+	printf("\textended    use extended (prepare/bind/execute) protocol, better than simple\n");
+	printf("\tstoreproc   use store procedure\n");
+	printf("-T (d|n|o|p|s|i)\n");
+	printf("\td = Delivery, n = New-Order, o = Order-Status,\n");
+	printf("\tp = Payment, s = Stock-Level, i = Integrity\n");
+	printf("-w #\n");
+	printf("\tnumber of warehouses, default 1\n");
+	printf("-c #\n");
+	printf("\tcustomer cardinality, default %d\n",
+		   CUSTOMER_CARDINALITY);
+	printf("-i #\n");
+	printf("\titem cardinality, default %d\n", ITEM_CARDINALITY);
+	printf("-o #\n");
+	printf("\torder cardinality, default %d\n", ORDER_CARDINALITY);
+	printf("-n #\n");
+	printf("\tnew-order cardinality, default %d\n",
+		   NEW_ORDER_CARDINALITY);
+}
+
 int main(int argc, char *argv[])
 {
 	int transaction = -1;
@@ -39,32 +69,7 @@ int main(int argc, char *argv[])
 	init_dbc_manager();
 
 	if (argc < 3) {
-		printf("usage: %s -t <dbms> -T d/n/o/p/s [-w #] [-c #] [-i #] [-o #] [-n #]",
-			argv[0]);
-		printf("\n");
-		printf("-t <dbms>\n");
-		printf("\tavailable:%s\n", dbc_manager_get_dbcnames());
-		printf("%s", dbc_manager_get_dbcusages());
-		printf("-I interface\n");
-		printf("\trun test using sql interface, available:\n");
-		printf("\tsimple      default, just send sql statement to database\n");
-		printf("\textended    use extended (prepare/bind/execute) protocol, better than simple\n");
-		printf("\tstoreproc   use store procedure\n");
-		printf("-T (d|n|o|p|s|i)\n");
-		printf("\td = Delivery, n = New-Order, o = Order-Status,\n");
-		printf("\tp = Payment, s = Stock-Level, i = Integrity\n");
-		printf("-w #\n");
-		printf("\tnumber of warehouses, default 1\n");
-		printf("-c #\n");
-		printf("\tcustomer cardinality, default %d\n",
-			CUSTOMER_CARDINALITY);
-		printf("-i #\n");
-		printf("\titem cardinality, default %d\n", ITEM_CARDINALITY);
-		printf("-o #\n");
-		printf("\torder cardinality, default %d\n", ORDER_CARDINALITY);
-		printf("-n #\n");
-		printf("\tnew-order cardinality, default %d\n",
-			   NEW_ORDER_CARDINALITY);
+		usage(argv[0]);
 		return 1;
 	}
 
@@ -100,17 +105,13 @@ parse_dbc_type_done:
 	opterr = 1;
 	while (1) {
 		int option_index = 0;
-		c = getopt_long(argc, argv, "c:i:I:n:o:t:T:w:",
-			dbms_long_options, &option_index);
-		if (c == -1) {
-			printf("unkown option\n");
-			printf("Try \"%s --help\" for more information.\n", argv[0]);
+		c = getopt_long(argc, argv, "c:i:I:n:o:t:T:w:?", dbms_long_options, &option_index);
+		if (c == -1)
 			break;
-		}
 		switch (c) {
 		case 0:
 			if(dbc_manager_set_dbcoption(dbms_long_options[option_index].name, optarg) == ERROR)
-				return 3;
+				return 1;
 			break;
 		case 'T':
 			if (optarg[0] == 'd')
@@ -126,8 +127,8 @@ parse_dbc_type_done:
 			else if (optarg[0] == 'i')
 				transaction = INTEGRITY;
 			else {
-				printf("unknown transaction: %s\n", optarg);
-				return 3;
+				printf("unknown transaction type: %s\n", optarg);
+				return 1;
 			}
 			break;
 			case 'w':
@@ -159,8 +160,8 @@ parse_dbc_type_done:
 			table_cardinality.new_orders = atoi(optarg);
 			break;
 		case '?':
-			return 3;
-			break;
+			usage(argv[0]);
+			return 0;
 		default:
 			break;
 		}
@@ -229,13 +230,13 @@ parse_dbc_type_done:
 
 		if (connect_to_db(dbc) != OK) {
 			printf("cannot establish a database connection\n");
-			return 6;
+			return 1;
 		}
 		if (process_transaction(transaction, dbc,
 			(void *) &transaction_data) != OK) {
 			disconnect_from_db(dbc);
 			printf("transaction failed\n");
-			return 11;
+			return 1;
 		}
 		disconnect_from_db(dbc);
 
