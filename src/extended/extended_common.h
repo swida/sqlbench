@@ -262,17 +262,15 @@ int dbt2_free_values(char ** values, int max_values);
 
 #define N_STOCK_LEVEL_2 "STOCK_LEVEL_2"
 #define STOCK_LEVEL_2 \
-	"SELECT count(*)\n" \
-	"FROM order_line, stock, district\n" \
-	"WHERE d_id = $1\n" \
-	"  AND d_w_id = $2\n" \
-	"  AND d_id = ol_d_id\n" \
-	"  AND d_w_id = ol_w_id\n" \
-	"  AND ol_i_id = s_i_id\n" \
-	"  AND ol_w_id = s_w_id\n" \
-	"  AND s_quantity < $3\n" \
-	"  AND ol_o_id BETWEEN ($4)\n" \
-	"		  AND ($5)"
+	"SELECT COUNT(DISTINCT s_i_id)\n" \
+	"FROM order_line, stock\n" \
+	"WHERE ol_w_id = $1\n" \
+	"  AND ol_d_id= $2\n" \
+	"  AND ol_o_id < $3\n" \
+	"  AND ol_o_id >= $4\n" \
+	"  AND s_w_id = $1\n" \
+	"  AND s_i_id = ol_i_id\n" \
+	"  AND s_quantity < $5"
 
 #define N_INTEGRITY_1 "INTEGRITY_1"
 #define INTEGRITY_1 \

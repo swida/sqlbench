@@ -22,18 +22,15 @@ BEGIN
 	WHERE d_w_id = in_w_id
 	AND d_id = in_d_id;
 
-	SELECT count(*)
-	INTO low_stock
-	FROM order_line, stock, district
-	WHERE d_id = in_d_id
-	  AND d_w_id = in_w_id
-	  AND d_id = ol_d_id
-	  AND d_w_id = ol_w_id
-	  AND ol_i_id = s_i_id
-	  AND ol_w_id = s_w_id
-	  AND s_quantity < in_threshold
-	  AND ol_o_id BETWEEN (tmp_d_next_o_id - 20)
-	                  AND (tmp_d_next_o_id -1);
+	SELECT COUNT(DISTINCT s_i_id)
+	FROM order_line, stock
+	WHERE ol_w_id = in_w_id
+	  AND ol_d_id= in_d_id
+	  AND ol_o_id < (tmp_d_next_o_id - 1)
+	  AND ol_o_id >= (tmp_d_next_o_id - 20)
+	  AND s_w_id = in_w_id
+	  AND s_i_id = ol_i_id
+	  AND s_quantity < in_threshold;
 
 	RETURN low_stock;
 END;

@@ -86,18 +86,17 @@ stock_level(struct db_context_t *dbc, struct stock_level_t *data, char ** vals, 
 	{
 		return -1;
 	}
-	sprintf(params[0], "%d", d_id);
-	sprintf(params[1], "%d", w_id);
-	sprintf(params[2], "%d", threshold);
+	sprintf(params[0], "%d", w_id);
+	sprintf(params[1], "%d", d_id);
+	sprintf(params[2], "%d", d_next_o_id - 1);
 	sprintf(params[3], "%d", d_next_o_id - 20);
-	sprintf(params[4], "%d", d_next_o_id - 1);
+	sprintf(params[4], "%d", threshold);
 	num_params = 5;
 
 #ifdef DEBUG_QUERY
 	LOG_ERROR_MESSAGE("%s query: %s, $1 = %d, $2 = %d, $3 = %d, $4 = %d, $5 = %d\n",
 					  N_STOCK_LEVEL_2, STOCK_LEVEL_2,
-					  d_id, w_id, threshold, d_next_o_id - 20,
-					  d_next_o_id - 1);
+					  w_id, d_id, d_next_o_id - 1, d_next_o_id - 20, threshold);
 #endif
 	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, N_STOCK_LEVEL_2) && result.result_set)
 	{

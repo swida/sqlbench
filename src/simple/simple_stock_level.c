@@ -73,8 +73,8 @@ int stock_level(struct db_context_t *dbc, struct stock_level_t *data, char ** va
 		return -1;
 	}
 
-	sprintf(query, STOCK_LEVEL_2, d_id, w_id, threshold, d_next_o_id - 20,
-			d_next_o_id - 1);
+	sprintf(query, STOCK_LEVEL_2, w_id, d_id, d_next_o_id - 1,
+			d_next_o_id - 20, w_id, threshold);
 
 #ifdef DEBUG_QUERY
 	LOG_ERROR_MESSAGE("STOCK_LEVEL_2 query: %s\n",query);
