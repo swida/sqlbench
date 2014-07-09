@@ -1,0 +1,63 @@
+#!/bin/sh
+
+#
+# This file is released under the terms of the Artistic License.
+# Please see the file LICENSE, included in this package, for details.
+#
+# Copyright (C) 2002-2008 Mark Wong & Open Source Development Labs, Inc.
+#
+
+if [ "x${DBT2DBNAME}" = "x" ]; then
+	echo "DBT2DBNAME not defined."
+	exit 1
+fi
+
+usage()
+{
+	echo "Usage: dbt2-pgsql-load-stored-procs -t <c|plpgsql> [-l <PORT>]"
+	echo "    c       - C stored functions"
+	echo "    plpgsql - pl/pgsql stored functions"
+}
+
+while getopts "l:t:" OPT; do
+	case ${OPT} in
+	l)
+		PORT=${OPTARG}
+		;;
+	t)
+		TYPE=${OPTARG}
+		;;
+	esac
+done
+
+if [ -z "${TYPE}" ]; then
+	usage
+	exit 1
+fi
+
+if [ ! "x${PORT}" = "x" ]; then
+	PORTARG="-p ${PORT}"
+fi
+
+PSQL="psql ${PORTARG} -e -d ${DBT2DBNAME}"
+SHAREDIR=`pg_config --sharedir`
+
+if [ "${TYPE}" == "plpgsql" ]; then
+	echo "loading pl/pgsql stored functions..."
+	${PSQL} -f ${SHAREDIR}/contrib/delivery.sql || exit 1
+	${PSQL} -f ${SHAREDIR}/contrib/new_order_2.sql || exit 1
+	${PSQL} -f ${SHAREDIR}/contrib/new_order.sql || exit 1
+	${PSQL} -f ${SHAREDIR}/contrib/order_status.sql || exit 1
+	${PSQL} -f ${SHAREDIR}/contrib/payment.sql || exit 1
+	${PSQL} -f ${SHAREDIR}/contrib/stock_level.sql || exit 1
+elif [ "${TYPE}" == "c" ]; then
+	echo "loading C stored functions..."
+	${PSQL} -f ${SHAREDIR}/contrib/delivery.sql || exit 1
+	${PSQL} -f ${SHAREDIR}/contrib/new_order.sql || exit 1
+	${PSQL} -f ${SHAREDIR}/contrib/order_status.sql || exit 1
+	${PSQL} -f ${SHAREDIR}/contrib/payment.sql || exit 1
+	${PSQL} -f ${SHAREDIR}/contrib/stock_level.sql || exit 1
+else
+	echo "unknown stored function type: ${TYPE}"
+	exit 2
+fi

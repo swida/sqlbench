@@ -1,0 +1,232 @@
+#!/bin/sh
+
+#
+# This file is released under the terms of the Artistic License.
+# Please see the file LICENSE, included in this package, for details.
+#
+# Copyright (C) 2002-2008 Mark Wong & Open Source Development Labss, Inc.
+#
+
+if [ -z ${DBT2DBNAME} ]; then
+    echo "DBT2DBNAME not defined."
+    exit 1
+fi
+
+USE_TABLESPACES=0
+while getopts "l:t" OPT; do
+	case ${OPT} in
+	l)
+		PORT=${OPTARG}
+		;;
+	t)
+		USE_TABLESPACES=1
+		;;
+	esac
+done
+
+if [ ! "x${PORT}" = "x" ]; then
+	PORTARG="-p ${PORT}"
+fi
+PSQL="psql ${PORTARG} -e -d ${DBT2DBNAME}"
+
+if [ ${USE_TABLESPACES} -eq 1 ]; then
+	if [ "x${DBT2TSDIR}" = "x" ]; then
+		echo "DBT2TSDIR is not set."
+		exit 1
+	fi
+	TS_WAREHOUSE_DIR=${DBT2TSDIR}/warehouse/ts
+	TS_DISTRICT_DIR=${DBT2TSDIR}/district/ts
+	TS_CUSTOMER_DIR=${DBT2TSDIR}/customer/ts
+	TS_HISTORY_DIR=${DBT2TSDIR}/history/ts
+	TS_NEW_ORDER_DIR=${DBT2TSDIR}/new_order/ts
+	TS_ORDERS_DIR=${DBT2TSDIR}/orders/ts
+	TS_ORDER_LINE_DIR=${DBT2TSDIR}/order_line/ts
+	TS_ITEM_DIR=${DBT2TSDIR}/item/ts
+	TS_STOCK_DIR=${DBT2TSDIR}/stock/ts
+
+	#
+	# Creating 'ts' subdirectories because PostgreSQL doesn't like that
+	# 'lost+found' directory if a device was mounted at
+	# '${DBT2TSDIR}/warehouse'.
+	#
+	mkdir -p ${TS_WAREHOUSE_DIR} || exit 1
+	mkdir -p ${TS_DISTRICT_DIR} || exit 1
+	mkdir -p ${TS_CUSTOMER_DIR} || exit 1
+	mkdir -p ${TS_HISTORY_DIR} || exit 1
+	mkdir -p ${TS_NEW_ORDER_DIR} || exit 1
+	mkdir -p ${TS_ORDERS_DIR} || exit 1
+	mkdir -p ${TS_ORDER_LINE_DIR} || exit 1
+	mkdir -p ${TS_ITEM_DIR} || exit 1
+	mkdir -p ${TS_STOCK_DIR} || exit 1
+
+	TS_WAREHOUSE="TABLESPACE dbt2_warehouse"
+	TS_DISTRICT="TABLESPACE dbt2_district"
+	TS_CUSTOMER="TABLESPACE dbt2_customer"
+	TS_HISTORY="TABLESPACE dbt2_history"
+	TS_NEW_ORDER="TABLESPACE dbt2_new_order"
+	TS_ORDERS="TABLESPACE dbt2_orders"
+	TS_ORDER_LINE="TABLESPACE dbt2_order_line"
+	TS_ITEM="TABLESPACE dbt2_item"
+	TS_STOCK="TABLESPACE dbt2_stock"
+
+	#
+	# Don't need to '|| exit 1' in case the tablespaces do not already exist.
+	#
+	${PSQL} -c "DROP ${TS_WAREHOUSE};"
+	${PSQL} -c "CREATE ${TS_WAREHOUSE} LOCATION '${TS_WAREHOUSE_DIR}';"
+	${PSQL} -c "DROP ${TS_DISTRICT};"
+	${PSQL} -c "CREATE ${TS_DISTRICT} LOCATION '${TS_DISTRICT_DIR}';"
+	${PSQL} -c "DROP ${TS_CUSTOMER};"
+	${PSQL} -c "CREATE ${TS_CUSTOMER} LOCATION '${TS_CUSTOMER_DIR}';"
+	${PSQL} -c "DROP ${TS_HISTORY};"
+	${PSQL} -c "CREATE ${TS_HISTORY} LOCATION '${TS_HISTORY_DIR}';"
+	${PSQL} -c "DROP ${TS_NEW_ORDER};"
+	${PSQL} -c "CREATE ${TS_NEW_ORDER} LOCATION '${TS_NEW_ORDER_DIR}';"
+	${PSQL} -c "DROP ${TS_ORDERS};"
+	${PSQL} -c "CREATE ${TS_ORDERS} LOCATION '${TS_ORDERS_DIR}';"
+	${PSQL} -c "DROP ${TS_ORDER_LINE};"
+	${PSQL} -c "CREATE ${TS_ORDER_LINE} LOCATION '${TS_ORDER_LINE_DIR}';"
+	${PSQL} -c "DROP ${TS_ITEM};"
+	${PSQL} -c "CREATE ${TS_ITEM} LOCATION '${TS_ITEM_DIR}';"
+	${PSQL} -c "DROP ${TS_STOCK};"
+	${PSQL} -c "CREATE ${TS_STOCK} LOCATION '${TS_STOCK_DIR}';"
+fi
+
+${PSQL} -c "
+CREATE TABLE warehouse (
+    w_id INTEGER,
+    w_name VARCHAR(10),
+    w_street_1 VARCHAR(20),
+    w_street_2 VARCHAR(20),
+    w_city VARCHAR(20),
+    w_state char(2),
+    w_zip char(9),
+    w_tax REAL,
+    w_ytd NUMERIC(24, 12))
+    ${TS_WAREHOUSE};
+" || exit 1
+
+${PSQL} -c "
+CREATE TABLE district (
+    d_id INTEGER,
+    d_w_id INTEGER,
+    d_name VARCHAR(10),
+    d_street_1 VARCHAR(20),
+    d_street_2 VARCHAR(20),
+    d_city VARCHAR(20),
+    d_state char(2),
+    d_zip char(9),
+    d_tax REAL,
+    d_ytd NUMERIC(24, 12),
+    d_next_o_id INTEGER)
+    ${TS_DISTRICT};
+" || exit 1
+
+${PSQL} -c "
+CREATE TABLE customer (
+    c_id INTEGER,
+    c_d_id INTEGER,
+    c_w_id INTEGER,
+    c_first VARCHAR(16),
+    c_middle char(2),
+    c_last VARCHAR(16),
+    c_street_1 VARCHAR(20),
+    c_street_2 VARCHAR(20),
+    c_city VARCHAR(20),
+    c_state char(2),
+    c_zip char(9),
+    c_phone char(16),
+    c_since TIMESTAMP,
+    c_credit char(2),
+    c_credit_lim NUMERIC(24, 12),
+    c_discount REAL,
+    c_balance NUMERIC(24, 12),
+    c_ytd_payment NUMERIC(24, 12),
+    c_payment_cnt REAL,
+    c_delivery_cnt REAL,
+    c_data VARCHAR(500))
+    ${TS_CUSTOMER};
+" || exit 1
+
+${PSQL} -c "
+CREATE TABLE history (
+    h_c_id INTEGER,
+    h_c_d_id INTEGER,
+    h_c_w_id INTEGER,
+    h_d_id INTEGER,
+    h_w_id INTEGER,
+    h_date TIMESTAMP,
+    h_amount REAL,
+    h_data VARCHAR(24) )
+    ${TS_HISTORY};
+" || exit 1
+
+${PSQL} -c "
+CREATE TABLE new_order (
+    no_o_id INTEGER,
+    no_d_id INTEGER,
+    no_w_id INTEGER)
+    ${TS_NEW_ORDER};
+" || exit 1
+
+${PSQL} -c "
+CREATE TABLE orders (
+    o_id INTEGER,
+    o_d_id INTEGER,
+    o_w_id INTEGER,
+    o_c_id INTEGER,
+    o_entry_d TIMESTAMP,
+    o_carrier_id INTEGER,
+    o_ol_cnt INTEGER,
+    o_all_local REAL)
+    ${TS_ORDERS};
+" || exit 1
+
+${PSQL} -c "
+CREATE TABLE order_line (
+    ol_o_id INTEGER,
+    ol_d_id INTEGER,
+    ol_w_id INTEGER,
+    ol_number INTEGER,
+    ol_i_id INTEGER,
+    ol_supply_w_id INTEGER,
+    ol_delivery_d TIMESTAMP,
+    ol_quantity REAL,
+    ol_amount REAL,
+    ol_dist_info VARCHAR(24))
+    ${TS_ORDER_LINE};
+" || exit 1
+
+${PSQL} -c "
+CREATE TABLE item (
+    i_id INTEGER,
+    i_im_id INTEGER,
+    i_name VARCHAR(24),
+    i_price REAL,
+    i_data VARCHAR(50))
+    ${TS_ITEM};
+" || exit 1
+
+${PSQL} -c "
+CREATE TABLE stock (
+    s_i_id INTEGER,
+    s_w_id INTEGER,
+    s_quantity REAL,
+    s_dist_01 VARCHAR(24),
+    s_dist_02 VARCHAR(24),
+    s_dist_03 VARCHAR(24),
+    s_dist_04 VARCHAR(24),
+    s_dist_05 VARCHAR(24),
+    s_dist_06 VARCHAR(24),
+    s_dist_07 VARCHAR(24),
+    s_dist_08 VARCHAR(24),
+    s_dist_09 VARCHAR(24),
+    s_dist_10 VARCHAR(24),
+    s_ytd NUMERIC(16, 8),
+    s_order_cnt REAL,
+    s_remote_cnt REAL,
+    s_data VARCHAR(50))
+    ${TS_STOCK};
+" || exit 1
+
+exit 0

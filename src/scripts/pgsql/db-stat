@@ -1,0 +1,117 @@
+#!/bin/sh
+
+#
+# This file is released under the terms of the Artistic License.
+# Please see the file LICENSE, included in this package, for details.
+#
+# Copyright (C) 2002-2006 Open Source Development Labs, Inc.
+#               2002-2010 Mark Wong
+#
+
+if [ -z ${DBT2DBNAME} ]; then
+	echo "DBT2DBNAME not defined."
+	exit 1
+fi
+
+while getopts "l:i:o:s:" opt; do
+	case $opt in
+	i)
+		ITERATIONS=$OPTARG
+		;;
+	l)
+		PORT=${OPTARG}
+		;;
+	o)
+		OUTPUT_DIR=$OPTARG
+		;;
+	s)
+		SAMPLE_LENGTH=$OPTARG
+		;;
+	esac
+done
+
+if [ ! "x${PORT}" = "x" ]; then
+	PORTARG="-p ${PORT}"
+	PORTARG2="-l ${PORT}"
+fi
+
+PSQL="psql ${PORTARG} -d ${DBT2DBNAME} -t --no-align"
+PSQL2="psql ${PORTARG} -d ${DBT2DBNAME} -t --no-align"
+
+# Get the OS version that the database system is running on, in case it's
+# different.
+uname -a >> ${OUTPUT_DIR}/readme.txt
+
+# Get database version.
+pg_config --version >> $OUTPUT_DIR/readme.txt
+
+# Get database parameters.
+${PSQL} -c "show all"  > $OUTPUT_DIR/param.out
+
+# Get list of tables in the public schema, where dbt2 is expected to be.
+# This file is used for the report generation.
+${PSQL2} -c "
+SELECT tablename
+FROM pg_tables
+WHERE schemaname = 'public'
+ORDER BY tablename;" > ${OUTPUT_DIR}/table-list.txt
+
+# Get list of indexes in the public schema, where dbt2 is expected to be.
+# This file is used for the report generation.
+${PSQL2} -c "
+SELECT indexname
+FROM pg_indexes
+WHERE schemaname = 'public'
+ORDER BY indexname;" > ${OUTPUT_DIR}/index-list.txt
+
+# Get the plans before the test.
+dbt2-pgsql-plans ${PORTARG2} -o ${OUTPUT_DIR}/plan0.out
+
+COUNTER=0
+
+while [ $COUNTER -lt $ITERATIONS ]; do
+	${PSQL} -c "
+SELECT EXTRACT(EPOCH FROM TRANSACTION_TIMESTAMP()), relname, pid, mode, granted
+FROM pg_locks, pg_class
+WHERE relfilenode = relation
+ORDER BY relname;
+;" >> $OUTPUT_DIR/lockstats.out &
+
+	${PSQL} -c "
+SELECT EXTRACT(EPOCH FROM TRANSACTION_TIMESTAMP()), datname, procpid, usesysid,
+       usename, application_name, client_addr, client_port, backend_start,
+       xact_start, query_start, waiting, current_query
+FROM pg_stat_activity
+;" >> $OUTPUT_DIR/db_activity.out &
+
+	${PSQL} -c "
+SELECT EXTRACT(EPOCH FROM TRANSACTION_TIMESTAMP()), datname, numbackends,
+       xact_commit, xact_rollback, blks_read, blks_hit, tup_returned,
+       tup_fetched, tup_inserted, tup_updated, tup_deleted
+FROM pg_stat_database
+;" >> $OUTPUT_DIR/pg_stat_databases.out &
+
+    ${PSQL} -c "
+SELECT EXTRACT(EPOCH FROM TRANSACTION_TIMESTAMP()), a.schemaname, a.relname,
+       seq_scan, seq_tup_read, idx_scan, idx_tup_fetch, n_tup_ins, n_tup_upd,
+       n_tup_del, n_tup_hot_upd, n_live_tup, n_dead_tup, heap_blks_read,
+       heap_blks_hit, idx_blks_read, idx_blks_hit, toast_blks_read,
+       toast_blks_hit, tidx_blks_read, tidx_blks_hit
+FROM pg_statio_all_tables a, pg_stat_all_tables b
+WHERE a.relid = b.relid
+; " >> $OUTPUT_DIR/pg_stat_tables.out &
+
+	${PSQL} -c "
+SELECT EXTRACT(EPOCH FROM TRANSACTION_TIMESTAMP()), a.schemaname, a.relname,
+       a.indexrelname, idx_scan, idx_tup_read, idx_tup_fetch, idx_blks_read,
+       idx_blks_hit
+FROM pg_stat_all_indexes a, pg_statio_all_indexes b
+WHERE a.indexrelid = b.indexrelid
+; " >> $OUTPUT_DIR/pg_stat_indexes.out &
+
+	COUNTER=$(( $COUNTER+1 ))
+	sleep $SAMPLE_LENGTH
+done
+
+# Get the plans after the test.
+dbt2-pgsql-plans ${PORTARG2} -o ${OUTPUT_DIR}/plan1.out

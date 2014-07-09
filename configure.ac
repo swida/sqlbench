@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([sqlbench], [0.5.0], [dianchengwang@gmail.com])
+AC_INIT([sqlbench], [0.6.0], [dianchengwang@gmail.com])
 AM_INIT_AUTOMAKE([silent-rules])
 AC_CONFIG_SRCDIR([src/core/driver.c])
 AC_CONFIG_HEADERS([config.h])
@@ -92,5 +92,7 @@ AC_CONFIG_FILES(
 	src/storeproc/kingbase/Makefile
 	src/storeproc/kingbase/plsql/Makefile
 	src/utils/Makefile
+	src/scripts/Makefile
+	src/scripts/pgsql/Makefile
 	src/include/Makefile])
 AC_OUTPUT

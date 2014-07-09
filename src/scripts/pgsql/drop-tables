@@ -1,0 +1,36 @@
+#!/bin/sh
+
+#
+# This file is released under the terms of the Artistic License.
+# Please see the file LICENSE, included in this package, for details.
+#
+# Copyright (C) 2002-2008 Mark Wong & Open Source Development Labs, Inc.
+#
+
+if [ "x${DBT2DBNAME}" = "x" ]; then
+    echo "DBT2DBNAME not defined."
+    exit 1
+fi
+
+while getopts "l:" OPT; do
+	case ${OPT} in
+	l)
+		PORT=${OPTARG}
+		;;
+	esac
+done
+
+if [ ! "x${PORT}" = "x" ]; then
+	PORTARG="-p ${PORT}"
+fi
+PSQL="psql ${PORTARG} -d ${DBT2DBNAME}"
+
+${PSQL} -c "DROP TABLE customer;"
+${PSQL} -c "DROP TABLE district;"
+${PSQL} -c "DROP TABLE history;"
+${PSQL} -c "DROP TABLE item;"
+${PSQL} -c "DROP TABLE new_order;"
+${PSQL} -c "DROP TABLE order_line;"
+${PSQL} -c "DROP TABLE orders;"
+${PSQL} -c "DROP TABLE stock;"
+${PSQL} -c "DROP TABLE warehouse;"
