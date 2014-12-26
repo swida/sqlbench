@@ -203,7 +203,7 @@ CREATE TABLE item (
     i_im_id INTEGER,
     i_name VARCHAR(24),
     i_price REAL,
-    i_data VARCHAR(50)) DISTRIBUTE BY REPLICATION
+    i_data VARCHAR(50)) DISTRIBUTE BY HASH (i_id)
     ${TS_ITEM};
 " || exit 1
 
