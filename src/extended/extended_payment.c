@@ -303,9 +303,9 @@ payment(struct db_context_t *dbc, struct payment_t *data, char ** vals, int  nva
 		num_params = 5;
 
 #ifdef DEBUG_QUERY
-		LOG_ERROR_MESSAGE("%s query: %s, $1 = $f, $2 = %s, $3 = %d, $4 = %d, $5 = %d\n",
+		LOG_ERROR_MESSAGE("%s query: %s, $1 = %f, $2 = %s, $3 = %d, $4 = %d, $5 = %d\n",
 						  N_PAYMENT_7_BC, PAYMENT_7_BC,
-						  h_amout, my_c_data, my_c_id, c_w_id, c_d_id);
+						  h_amount, my_c_data, my_c_id, c_w_id, c_d_id);
 #endif
 
 		if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, N_PAYMENT_7_BC))

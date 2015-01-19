@@ -198,6 +198,12 @@ int  new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals,
 				i_data[i]= dbc_sql_getvalue(dbc, &result, 2);
 
 				dbc_sql_close_cursor(dbc, &result);
+				if (!i_price[i])
+				{
+					LOG_ERROR_MESSAGE("NULL or empty result set returned, NEW_ORDER_7 query: %s\n", query);
+					rc = -1;
+					break;
+				}
             }
             else
             {
@@ -224,13 +230,19 @@ int  new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals,
 #endif
 		if (dbc_sql_execute(dbc, query, &result, "NEW_ORDER_8") && result.result_set)
 		{
-            dbc_sql_fetchrow(dbc, &result);
+			dbc_sql_fetchrow(dbc, &result);
 
             s_quantity[i]= dbc_sql_getvalue(dbc, &result, 0);
             my_s_dist[i]= dbc_sql_getvalue(dbc, &result, 1);
             s_data[i]= dbc_sql_getvalue(dbc, &result, 2);
 
             dbc_sql_close_cursor(dbc, &result);
+			if (!s_quantity[i])
+			{
+				LOG_ERROR_MESSAGE("NULL or empty result set returned, NEW_ORDER_8 query: %s\n", query);
+				rc=16;
+				break;
+			}
 		}
 		else //error
 		{

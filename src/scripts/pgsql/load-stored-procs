@@ -42,7 +42,7 @@ fi
 PSQL="psql ${PORTARG} -e -d ${DBT2DBNAME}"
 SHAREDIR=`pg_config --sharedir`
 
-if [ "${TYPE}" == "plpgsql" ]; then
+if [ "${TYPE}" = "plpgsql" ]; then
 	echo "loading pl/pgsql stored functions..."
 	${PSQL} -f ${SHAREDIR}/contrib/delivery.sql || exit 1
 	${PSQL} -f ${SHAREDIR}/contrib/new_order_2.sql || exit 1
@@ -50,7 +50,7 @@ if [ "${TYPE}" == "plpgsql" ]; then
 	${PSQL} -f ${SHAREDIR}/contrib/order_status.sql || exit 1
 	${PSQL} -f ${SHAREDIR}/contrib/payment.sql || exit 1
 	${PSQL} -f ${SHAREDIR}/contrib/stock_level.sql || exit 1
-elif [ "${TYPE}" == "c" ]; then
+elif [ "${TYPE}" = "c" ]; then
 	echo "loading C stored functions..."
 	${PSQL} -f ${SHAREDIR}/contrib/delivery.sql || exit 1
 	${PSQL} -f ${SHAREDIR}/contrib/new_order.sql || exit 1

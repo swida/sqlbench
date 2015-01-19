@@ -149,9 +149,9 @@ new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int 
 
 #ifdef DEBUG_QUERY
 	if(_is_forupdate_supported)
-		LOG_ERROR_MESSAGE("%s query: %s, $1 = %d, $2 = $d\n", query_name, N_NEW_ORDER_2, w_id, d_id);
+		LOG_ERROR_MESSAGE("%s query: %s, $1 = %d, $2 = %d\n", query_name, N_NEW_ORDER_2, w_id, d_id);
 	else
-		LOG_ERROR_MESSAGE("%s query: %s, $1 = %d, $2 = $d\n", query_name, N_NEW_ORDER_2_WITHOUT_FORUPDATE, w_id, d_id);		
+		LOG_ERROR_MESSAGE("%s query: %s, $1 = %d, $2 = %d\n", query_name, N_NEW_ORDER_2_WITHOUT_FORUPDATE, w_id, d_id);
 #endif
 
 	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, query_name) && result.result_set)
@@ -161,6 +161,14 @@ new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int 
 		vals[D_TAX]= dbc_sql_getvalue(dbc, &result, 0);       //D_TAX
 		vals[D_NEXT_O_ID]= dbc_sql_getvalue(dbc, &result, 1); //D_NEXT_O_ID
 		dbc_sql_close_cursor(dbc, &result);
+
+		if (!vals[D_NEXT_O_ID])
+		{
+			LOG_ERROR_MESSAGE("NULL or empty rows for D_NEXT_O_ID returned: %s, $1=%d, $2=%d \n",
+							  _is_forupdate_supported ? N_NEW_ORDER_2 : N_NEW_ORDER_2_WITHOUT_FORUPDATE,
+							  w_id, d_id);
+			return 11;
+		}
 	}
 	else //error
 	{
@@ -251,6 +259,13 @@ new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int 
 				i_data[i]= dbc_sql_getvalue(dbc, &result, 2);
 
 				dbc_sql_close_cursor(dbc, &result);
+				if (!i_price[i])
+				{
+					LOG_ERROR_MESSAGE("NULL or empty result return, NEW_ORDER_7: %s, $1 = %d",
+									  i, NEW_ORDER_7, ol_i_id[i]);
+					rc = -1;
+					break;
+				}
             }
             else
             {
@@ -262,7 +277,7 @@ new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int 
 		{
             /* Item doesn't exist, rollback transaction. */
 #ifdef DEBUG_QUERY
-            LOG_ERROR_MESSAGE("ROLLBACK BECAUSE OL_I_ID[%d]= 0 for query:\nNEW_ORDER_7: %s", i, query);
+            LOG_ERROR_MESSAGE("ROLLBACK BECAUSE OL_I_ID[%d]= 0 for query:\nNEW_ORDER_7: %s", i, NEW_ORDER_7);
 #endif
             rc=2;
             break;
@@ -288,6 +303,13 @@ new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int 
             s_data[i]= dbc_sql_getvalue(dbc, &result, 2);
 
             dbc_sql_close_cursor(dbc, &result);
+			if (!s_quantity[i] || !my_s_dist[i])
+			{
+				LOG_ERROR_MESSAGE("NULL or empty result returned: %s query %s, %%s = %s, $1 = %s, %2 = %s",
+								  query_name, NEW_ORDER_8, s_dist[d_id -1], params[0], params[1]);
+				rc = 16;
+				break;
+			}
 		}
 		else //error
 		{

@@ -217,10 +217,9 @@ order_status(struct db_context_t *dbc, struct order_status_t *data, char ** vals
 		return -1;
 	}
 
-	/* parameters is same with prevous query */
 #ifdef DEBUG_QUERY
 	LOG_ERROR_MESSAGE(
-		"%s %s\n",
+		"%s %s, $1 = %d, $2 = %d, $3 = %d\n",
 		N_ORDER_STATUS_3, ORDER_STATUS_3, c_w_id, c_d_id, my_c_id);
 #endif
 	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, N_ORDER_STATUS_3) && result.result_set)
@@ -233,6 +232,12 @@ order_status(struct db_context_t *dbc, struct order_status_t *data, char ** vals
 		vals[O_OL_CNT]= dbc_sql_getvalue(dbc, &result, 3);
 
 		dbc_sql_close_cursor(dbc, &result);
+		if (!vals[O_ID])
+		{
+			LOG_ERROR_MESSAGE("NULL or empty result returned: %s %s, $1 = %d, $2 = %d, $3 = %d\n",
+							  N_ORDER_STATUS_3, ORDER_STATUS_3, c_w_id, c_d_id, my_c_id);
+			return -1;
+		}
 	}
 	else //error
 	{

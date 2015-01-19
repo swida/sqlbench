@@ -98,7 +98,8 @@ int pgsql_sp_new_order(struct db_context_t *_dbc, struct new_order_t *data)
 	dbc_sql_fetchrow(_dbc, &result);
 	dbt2_init_values(tran_status, 1);
 	tran_status[0] = dbc_sql_getvalue(_dbc, &result, 0);
-	data->rollback = atoi(tran_status[0]);
+	if (tran_status[0])
+		data->rollback = atoi(tran_status[0]);
 	dbt2_free_values(tran_status, 1);
 
 	dbc_sql_close_cursor(_dbc, &result);

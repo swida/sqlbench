@@ -46,7 +46,7 @@ static cached_statement statements[] = {
 	"  AND ol_o_id >= $4\n" \
 	"  AND s_w_id = $1\n" \
 	"  AND s_i_id = ol_i_id\n" \
-	"  AND s_quantity < $5"
+	"  AND s_quantity < $5",
 	5, { INT4OID, INT4OID, INT4OID, INT4OID, INT4OID }
 	},
 

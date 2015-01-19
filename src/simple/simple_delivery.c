@@ -60,10 +60,7 @@ int delivery(struct db_context_t *dbc, struct delivery_t *data, char ** vals, in
             dbc_sql_close_cursor(dbc, &result);
 
             if (!vals[NO_O_ID])
-            {
 				LOG_ERROR_MESSAGE("ERROR: NO_O_ID=NULL for query DELIVERY_1:\n%s\n", query);
-				//return -1;
-            }
 		}
 		else
 		{
@@ -94,10 +91,7 @@ int delivery(struct db_context_t *dbc, struct delivery_t *data, char ** vals, in
 				dbc_sql_close_cursor(dbc, &result);
 
 				if (!vals[O_C_ID])
-				{
 					LOG_ERROR_MESSAGE("DELIVERY_3:query %s\nO_C_ID= NULL", query);
-					//return -1;
-				}
             }
             else //error
             {

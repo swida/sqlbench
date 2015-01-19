@@ -36,7 +36,7 @@ if [ ! "x${PORT}" = "x" ]; then
 	PORTARG="-p ${PORT}"
 fi
 
-if [ "x${OUTPUT_FILE}" == "x" ]; then
+if [ "x${OUTPUT_FILE}" = "x" ]; then
 	echo "usage: `basename $0` -o <outfile>"
 	exit 1
 fi
