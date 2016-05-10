@@ -28,19 +28,25 @@ pgsql_commit_transaction(struct db_context_t *_dbc)
 {
 	struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
 	PGresult *res;
+	int ret = OK;
 
 	if(!dbc->inTransaction)
-		return OK;
+		return ret;
 
 	res = PQexec(dbc->conn, "COMMIT");
 	if (!res || PQresultStatus(res) != PGRES_COMMAND_OK) {
 		LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
+
+		if (PQstatus(dbc->conn) != CONNECTION_OK)
+			dbc->base.need_reconnect = 1;
+
+		ret = ERROR;
 	}
 	PQclear(res);
 
 	dbc->inTransaction = 0;
 
-	return OK;
+	return ret;
 }
 
 /* Open a connection to the database. */
@@ -83,8 +89,14 @@ pgsql_connect_to_db(struct db_context_t *_dbc)
                         dbname);
                 LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
                 PQfinish(dbc->conn);
+
+				dbc->base.need_reconnect = 1;
+
                 return ERROR;
         }
+
+		dbc->base.need_reconnect = 0;
+
         return OK;
 }
 
@@ -94,6 +106,7 @@ pgsql_disconnect_from_db(struct db_context_t *_dbc)
 {
 	struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
 	PQfinish(dbc->conn);
+	dbc->conn = NULL;
 	return OK;
 }
 
@@ -111,17 +124,25 @@ pgsql_rollback_transaction(struct db_context_t *_dbc)
 	struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
 	PGresult *res;
 
-	if(!dbc->inTransaction)
-		return STATUS_ROLLBACK;
+	int ret = STATUS_ROLLBACK;
+
+	if (!dbc->inTransaction)
+		return ret;
 	
 	res = PQexec(dbc->conn, "ROLLBACK");
 	if (!res || PQresultStatus(res) != PGRES_COMMAND_OK) {
 		LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
+
+		if (PQstatus(dbc->conn) != CONNECTION_OK)
+			dbc->base.need_reconnect = 1;
+
+		ret = ERROR;
 	}
+
 	PQclear(res);
 	dbc->inTransaction = 0;
 
-	return STATUS_ROLLBACK;
+	return ret;
 }
 
 static int
@@ -138,6 +159,10 @@ pgsql_sql_execute(struct db_context_t *_dbc, char * query, struct sql_result_t *
 		if (!res || PQresultStatus(res) != PGRES_COMMAND_OK) {
 			LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
 			PQclear(res);
+
+			if (PQstatus(dbc->conn) != CONNECTION_OK)
+				dbc->base.need_reconnect = 1;
+
 			return ERROR;
 		}
 
@@ -149,6 +174,10 @@ pgsql_sql_execute(struct db_context_t *_dbc, char * query, struct sql_result_t *
 				 PQresultStatus(res) != PGRES_TUPLES_OK)) {
 		LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
 		PQclear(res);
+
+		if (PQstatus(dbc->conn) != CONNECTION_OK)
+			dbc->base.need_reconnect = 1;
+
 		return ERROR;
 	}
 
@@ -173,6 +202,10 @@ pgsql_sql_prepare(struct db_context_t *_dbc,  char *query, char *query_name)
 	if (!res || PQresultStatus(res) != PGRES_COMMAND_OK) {
 		LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
 		PQclear(res);
+
+		if (PQstatus(dbc->conn) != CONNECTION_OK)
+			dbc->base.need_reconnect = 1;
+
 		return ERROR;
 	}
 
@@ -196,6 +229,10 @@ pgsql_sql_execute_prepared(
 		if (!res || PQresultStatus(res) != PGRES_COMMAND_OK) {
 			LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
 			PQclear(res);
+
+			if (PQstatus(dbc->conn) != CONNECTION_OK)
+				dbc->base.need_reconnect = 1;
+
 			return ERROR;
 		}
 
@@ -207,6 +244,10 @@ pgsql_sql_execute_prepared(
 				 PQresultStatus(res) != PGRES_TUPLES_OK)) {
 		LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
 		PQclear(res);
+
+		if (PQstatus(dbc->conn) != CONNECTION_OK)
+			dbc->base.need_reconnect = 1;
+
 		return ERROR;
 	}
 

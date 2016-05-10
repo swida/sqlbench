@@ -86,8 +86,7 @@ int order_status(struct db_context_t *dbc, struct order_status_t *data, char ** 
 			// 2.6.2.2 says the (n/2 rounded up)-th row
 			if(result.num_rows != -1)
 			{
-				unsigned long skip_rows;
-				skip_rows=(result.num_rows+1)/2;
+				int skip_rows = (result.num_rows + 1) / 2;
 				do {
 					dbc_sql_fetchrow(dbc, &result);
 					skip_rows--;

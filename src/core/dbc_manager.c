@@ -7,7 +7,7 @@
 extern int pgsql_dbc_init();
 #ifdef ENABLE_KINGBASE
 extern int kingbase_dbc_init();
-#endif if
+#endif
 struct dbc_construct_t dbc_constructs[] =
 {
 	{pgsql_dbc_init},
@@ -170,6 +170,11 @@ dbc_rollback_transaction(struct db_context_t *dbc)
 {
 	assert(_dbc_info);
 	struct dbc_sql_operation_t *sop = _dbc_info->dbc_sql_operation;
+
+	/* If disconnected, return ERROR, let caller reconnect to db */
+	if (dbc->need_reconnect)
+	  return ERROR;
+
 	return (*(sop->rollback_transaction))(dbc);
 }
 

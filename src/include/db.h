@@ -23,6 +23,7 @@ enum sqlapi_type
 };
 
 struct db_context_t {
+	int need_reconnect;
 };
 
 struct sql_result_t
@@ -42,7 +43,8 @@ struct sqlapi_operation_t
 	int (*execute_stock_level) (struct db_context_t *dbc, struct stock_level_t *data);
 };
 
-int connect_to_db(struct db_context_t *dbc);
+extern int connect_to_db(struct db_context_t *dbc);
+extern int need_reconnect_to_db(struct db_context_t *dbc);
 
 struct db_context_t *db_init(void);
 

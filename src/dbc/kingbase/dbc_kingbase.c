@@ -26,19 +26,25 @@ kingbase_commit_transaction(struct db_context_t *_dbc)
 {
 	struct kingbase_context_t *dbc = (struct kingbase_context_t*) _dbc;
 	KCIResult *res;
+	int ret = OK;
 
 	if(!dbc->inTransaction)
-		return OK;
+		return ret;
 
 	res = KCIStatementExecute(dbc->conn, "COMMIT");
 	if (!res || KCIResultGetStatusCode(res) != EXECUTE_COMMAND_OK) {
 		LOG_ERROR_MESSAGE("%s", KCIConnectionGetLastError(dbc->conn));
+
+		if (KCIConnectionGetStatus(dbc->conn) != CONNECTION_OK)
+			dbc->base.need_reconnect = 1;
+
+		ret = ERROR;
 	}
 	KCIResultDealloc(res);
 
 	dbc->inTransaction = 0;
 
-	return OK;
+	return ret;
 }
 
 /* Open a connection to the database. */
@@ -58,8 +64,14 @@ kingbase_connect_to_db(struct db_context_t *_dbc)
                         dbname);
                 LOG_ERROR_MESSAGE("%s", KCIConnectionGetLastError(dbc->conn));
                 KCIConnectionDestory(dbc->conn);
+
+				dbc->base.need_reconnect = 1;
+
                 return ERROR;
         }
+
+		dbc->base.need_reconnect = 0;
+
         return OK;
 }
 
@@ -69,6 +81,7 @@ kingbase_disconnect_from_db(struct db_context_t *_dbc)
 {
 	struct kingbase_context_t *dbc = (struct kingbase_context_t*) _dbc;
 	KCIConnectionDestory(dbc->conn);
+	dbc->conn = NULL;
 	return OK;
 }
 
@@ -85,18 +98,23 @@ kingbase_rollback_transaction(struct db_context_t *_dbc)
 {
 	struct kingbase_context_t *dbc = (struct kingbase_context_t*) _dbc;
 	KCIResult *res;
-
+	int ret = STATUS_ROLLBACK;
 	if(!dbc->inTransaction)
-		return STATUS_ROLLBACK;
+		return ret;
 	
 	res = KCIStatementExecute(dbc->conn, "ROLLBACK");
 	if (!res || KCIResultGetStatusCode(res) != EXECUTE_COMMAND_OK) {
 		LOG_ERROR_MESSAGE("%s", KCIConnectionGetLastError(dbc->conn));
+
+		if (KCIConnectionGetStatus(dbc->conn) != CONNECTION_OK)
+			dbc->base.need_reconnect = 1;
+
+		ret = ERROR;
 	}
 	KCIResultDealloc(res);
 	dbc->inTransaction = 0;
 
-	return STATUS_ROLLBACK;
+	return ret;
 }
 
 static int
@@ -113,6 +131,10 @@ kingbase_sql_execute(struct db_context_t *_dbc, char * query, struct sql_result_
 		if (!res || KCIResultGetStatusCode(res) != EXECUTE_COMMAND_OK) {
 			LOG_ERROR_MESSAGE("%s", KCIConnectionGetLastError(dbc->conn));
 			KCIResultDealloc(res);
+
+		if (KCIConnectionGetStatus(dbc->conn) != CONNECTION_OK)
+			dbc->base.need_reconnect = 1;
+
 			return ERROR;
 		}
 
@@ -124,6 +146,10 @@ kingbase_sql_execute(struct db_context_t *_dbc, char * query, struct sql_result_
 				 KCIResultGetStatusCode(res) != EXECUTE_TUPLES_OK)) {
 		LOG_ERROR_MESSAGE("%s", KCIConnectionGetLastError(dbc->conn));
 		KCIResultDealloc(res);
+
+		if (KCIConnectionGetStatus(dbc->conn) != CONNECTION_OK)
+			dbc->base.need_reconnect = 1;
+
 		return ERROR;
 	}
 
@@ -148,6 +174,10 @@ kingbase_sql_prepare(struct db_context_t *_dbc,  char *query, char *query_name)
 	if (!res || KCIResultGetStatusCode(res) != EXECUTE_COMMAND_OK) {
 		LOG_ERROR_MESSAGE("%s", KCIConnectionGetLastError(dbc->conn));
 		KCIResultDealloc(res);
+
+		if (KCIConnectionGetStatus(dbc->conn) != CONNECTION_OK)
+			dbc->base.need_reconnect = 1;
+
 		return ERROR;
 	}
 
@@ -171,6 +201,10 @@ kingbase_sql_execute_prepared(
 		if (!res || KCIResultGetStatusCode(res) != EXECUTE_COMMAND_OK) {
 			LOG_ERROR_MESSAGE("%s", KCIConnectionGetLastError(dbc->conn));
 			KCIResultDealloc(res);
+
+			if (KCIConnectionGetStatus(dbc->conn) != CONNECTION_OK)
+				dbc->base.need_reconnect = 1;
+
 			return ERROR;
 		}
 
@@ -182,6 +216,10 @@ kingbase_sql_execute_prepared(
 				 KCIResultGetStatusCode(res) != EXECUTE_TUPLES_OK)) {
 		LOG_ERROR_MESSAGE("%s", KCIConnectionGetLastError(dbc->conn));
 		KCIResultDealloc(res);
+
+		if (KCIConnectionGetStatus(dbc->conn) != CONNECTION_OK)
+			dbc->base.need_reconnect = 1;
+
 		return ERROR;
 	}
 
