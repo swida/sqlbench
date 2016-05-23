@@ -64,8 +64,8 @@ kingbase_connect_to_db(struct db_context_t *_dbc)
                         dbname);
                 LOG_ERROR_MESSAGE("%s", KCIConnectionGetLastError(dbc->conn));
                 KCIConnectionDestory(dbc->conn);
-
-				dbc->base.need_reconnect = 1;
+		dbc->conn = NULL;
+		dbc->base.need_reconnect = 1;
 
                 return ERROR;
         }

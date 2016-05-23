@@ -69,6 +69,7 @@ pgsql_connect_to_db(struct db_context_t *_dbc)
 				LOG_ERROR_MESSAGE("using conninfo string '%s' connect to database failed.", dbname);
 				LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
 				PQfinish(dbc->conn);
+				dbc->conn = NULL;
 				return ERROR;
 			}
 			return OK;
@@ -89,7 +90,7 @@ pgsql_connect_to_db(struct db_context_t *_dbc)
                         dbname);
                 LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
                 PQfinish(dbc->conn);
-
+				dbc->conn = NULL;
 				dbc->base.need_reconnect = 1;
 
                 return ERROR;

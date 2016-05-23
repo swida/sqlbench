@@ -108,12 +108,12 @@ void *db_worker(void *data)
 			 */
 			while (need_reconnect_to_db(dbc))
 			{
-				LOG_ERROR_MESSAGE("detected need reconnect, reconnect to database");
+				LOG_ERROR_MESSAGE("try to reconnect to database");
 				disconnect_from_db(dbc);
 
 				if (connect_to_db(dbc) != OK)
 				{
-					LOG_ERROR_MESSAGE("reconnect connect error, try again after sleep 5 seconds");
+					LOG_ERROR_MESSAGE("reconnect to database error, try again after sleep 5 seconds");
 					sleep(5);
 				}
 			}
