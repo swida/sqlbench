@@ -9,12 +9,20 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <libpq-fe.h>
 
-#include "dbc_pgsql.h"
 #include "logging.h"
 #include "transaction_data.h"
 #include "dbc.h"
 #include "common.h"
+#include "db.h"
+
+struct pgsql_context_t
+{
+	struct db_context_t base;
+	PGconn *conn;
+	int inTransaction;
+};
 
 static char dbname[16][128] = {""};
 static char pgport[32] = "";

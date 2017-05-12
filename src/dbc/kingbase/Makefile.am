@@ -1,4 +1,4 @@
-noinst_LIBRARIES = libkingbase.a
+noinst_LIBRARIES = libdbc_kingbase.a
 
-libkingbase_a_SOURCES = dbc_kingbase.c dbc_kingbase.h
-libkingbase_a_CPPFLAGS = -I$(KINGBASE_INCLUDE_DIR) -I$(top_srcdir)/src/include
+libdbc_kingbase_a_SOURCES = dbc_kingbase.c
+libdbc_kingbase_a_CPPFLAGS = -I$(KINGBASE_INCLUDE_DIR) -I$(top_srcdir)/src/include

@@ -9,17 +9,25 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <libkci.h>
 
-#include "dbc_kingbase.h"
 #include "logging.h"
 #include "transaction_data.h"
 #include "dbc.h"
 #include "common.h"
+#include "db.h"
 
 static char dbname[32] = "dbt2";
 static char host[32] = "";
 static char port[32] = "54321";
 static char user[32] = "dbt2";
+
+struct kingbase_context_t
+{
+	struct db_context_t base;
+	KCIConnection *conn;
+	int inTransaction;
+};
 
 static int
 kingbase_commit_transaction(struct db_context_t *_dbc)

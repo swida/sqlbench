@@ -1,4 +1,4 @@
-noinst_LIBRARIES = libpgsql.a
+noinst_LIBRARIES = libdbc_pgsql.a
 
-libpgsql_a_SOURCES = dbc_common.c dbc_pgsql.h
-libpgsql_a_CPPFLAGS = -I$(PGSQL_INCLUDE_DIR) -I$(top_srcdir)/src/include
+libdbc_pgsql_a_SOURCES = dbc_pgsql.c
+libdbc_pgsql_a_CPPFLAGS = -I$(PGSQL_INCLUDE_DIR) -I$(top_srcdir)/src/include
