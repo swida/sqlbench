@@ -55,9 +55,9 @@ int delivery(struct db_context_t *dbc, struct delivery_t *data, char ** vals, in
 #endif
 		if (dbc_sql_execute(dbc, query, &result, "DELIVERY_1") && result.result_set)
 		{
-            dbc_sql_fetchrow(dbc, &result);
-            vals[NO_O_ID]= (char *)dbc_sql_getvalue(dbc, &result, 0);  //NO_O_ID
-            dbc_sql_close_cursor(dbc, &result);
+			dbc_sql_fetchrow(dbc, &result);
+			vals[NO_O_ID]= (char *)dbc_sql_getvalue(dbc, &result, 0);  //NO_O_ID
+			dbc_sql_close_cursor(dbc, &result);
 
             if (!vals[NO_O_ID])
 				LOG_ERROR_MESSAGE("ERROR: NO_O_ID=NULL for query DELIVERY_1:\n%s\n", query);

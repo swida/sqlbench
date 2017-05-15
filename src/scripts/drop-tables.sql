@@ -1,0 +1,9 @@
+ROP TABLE customer;
+ROP TABLE district;
+ROP TABLE history;
+ROP TABLE item;
+ROP TABLE new_order;
+ROP TABLE order_line;
+ROP TABLE orders;
+ROP TABLE stock;
+ROP TABLE warehouse;

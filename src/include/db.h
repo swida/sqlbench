@@ -30,7 +30,11 @@ struct sql_result_t
 {
 	void *result_set;
 	int num_rows;				/* -1 is unknown, just order-status use it. */
-	int current_row;
+	union
+	{
+		int current_row_num;
+		void *current_row;
+	};
 };
 
 struct sqlapi_operation_t

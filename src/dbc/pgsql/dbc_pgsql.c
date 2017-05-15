@@ -61,52 +61,52 @@ pgsql_commit_transaction(struct db_context_t *_dbc)
 static int
 pgsql_connect_to_db(struct db_context_t *_dbc)
 {
-		struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
-        char buf[1024];
-		int index = 0;
+	struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
+	char buf[1024];
+	int index = 0;
 
-		/* speical case: dbname is conninfo string */
-		if (dbname[0] != '\0' && strchr(dbname[0], '=') != NULL)
-		{
-			/* just conninfo string case support connect to multi-instance
-			 * database */
-			dbc->conn = PQconnectdb(dbname[last_dbname_connected++]);
-			if (last_dbname_connected >= dbname_count)
-				last_dbname_connected = 0;
-			if (PQstatus(dbc->conn) != CONNECTION_OK) {
-				LOG_ERROR_MESSAGE("using conninfo string '%s' connect to database failed.", dbname);
-				LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
-				PQfinish(dbc->conn);
-				dbc->conn = NULL;
-				return ERROR;
-			}
-			return OK;
+	/* speical case: dbname is conninfo string */
+	if (dbname[0] != '\0' && strchr(dbname[0], '=') != NULL)
+	{
+		/* just conninfo string case support connect to multi-instance
+		 * database */
+		dbc->conn = PQconnectdb(dbname[last_dbname_connected++]);
+		if (last_dbname_connected >= dbname_count)
+			last_dbname_connected = 0;
+		if (PQstatus(dbc->conn) != CONNECTION_OK) {
+			LOG_ERROR_MESSAGE("using conninfo string '%s' connect to database failed.", dbname);
+			LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
+			PQfinish(dbc->conn);
+			dbc->conn = NULL;
+			return ERROR;
 		}
+		return OK;
+	}
 
-		if (*dbname[0] != '\0')
-			index += snprintf(buf + index, sizeof(buf) - index, "dbname=%s ", dbname[0]);
-        if (*pghost != '\0')
-			index += snprintf(buf + index, sizeof(buf) - index, "host=%s ", pghost);
-		if (*pgport != '\0')
-			index += snprintf(buf + index, sizeof(buf) - index, "port=%s ", pgport);
-		if (*pguser != '\0')
-			index += snprintf(buf + index, sizeof(buf) - index, "user=%s ", pguser);
+	if (*dbname[0] != '\0')
+		index += snprintf(buf + index, sizeof(buf) - index, "dbname=%s ", dbname[0]);
+	if (*pghost != '\0')
+		index += snprintf(buf + index, sizeof(buf) - index, "host=%s ", pghost);
+	if (*pgport != '\0')
+		index += snprintf(buf + index, sizeof(buf) - index, "port=%s ", pgport);
+	if (*pguser != '\0')
+		index += snprintf(buf + index, sizeof(buf) - index, "user=%s ", pguser);
 
-        dbc->conn = PQconnectdb(buf);
-        if (PQstatus(dbc->conn) != CONNECTION_OK) {
-                LOG_ERROR_MESSAGE("Connection to database '%s' failed.",
-                        dbname);
-                LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
-                PQfinish(dbc->conn);
-				dbc->conn = NULL;
-				dbc->base.need_reconnect = 1;
+	dbc->conn = PQconnectdb(buf);
+	if (PQstatus(dbc->conn) != CONNECTION_OK) {
+		LOG_ERROR_MESSAGE("Connection to database '%s' failed.",
+						  dbname);
+		LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
+		PQfinish(dbc->conn);
+		dbc->conn = NULL;
+		dbc->base.need_reconnect = 1;
 
-                return ERROR;
-        }
+		return ERROR;
+	}
 
-		dbc->base.need_reconnect = 0;
+	dbc->base.need_reconnect = 0;
 
-        return OK;
+	return OK;
 }
 
 /* Disconnect from the database and free the connection handle. */
@@ -195,7 +195,7 @@ pgsql_sql_execute(struct db_context_t *_dbc, char * query, struct sql_result_t *
 	else
 	{
 		sql_result->result_set = res;
-		sql_result->current_row = -1;
+		sql_result->current_row_num = -1;
 		sql_result->num_rows = PQntuples(res);
 	}
 
@@ -265,7 +265,7 @@ pgsql_sql_execute_prepared(
 	else
 	{
 		sql_result->result_set = res;
-		sql_result->current_row = -1;
+		sql_result->current_row_num = -1;
 		sql_result->num_rows = PQntuples(res);
 	}
 
@@ -276,8 +276,8 @@ static int
 pgsql_sql_fetchrow(struct db_context_t *_dbc, struct sql_result_t * sql_result)
 {
 	PGresult *res = (PGresult *)sql_result->result_set;
-	sql_result->current_row++;
-	if(sql_result->current_row >= PQntuples(res))
+	sql_result->current_row_num++;
+	if(sql_result->current_row_num >= PQntuples(res))
 		return 0;
 	return 1;
 }
@@ -295,17 +295,17 @@ pgsql_sql_getvalue(struct db_context_t *_dbc, struct sql_result_t * sql_result, 
 {
 	PGresult *res = (PGresult *)sql_result->result_set;
 	char *tmp = NULL;
-	if (sql_result->current_row < 0 ||sql_result->current_row >= PQntuples(res) || field > PQnfields(res))
+	if (sql_result->current_row_num < 0 ||sql_result->current_row_num >= PQntuples(res) || field > PQnfields(res))
 	{
 #ifdef DEBUG_QUERY
 		LOG_ERROR_MESSAGE("pgsql_sql_getvalue: POSSIBLE NULL VALUE or ERROR\n\nRow: %d, Field: %d",
-						  sql_result->current_row, field);
+						  sql_result->current_row_num, field);
 #endif
 	return tmp;
 	}
 
-	if ((tmp = calloc(sizeof(char), PQgetlength(res, sql_result->current_row, field) + 1)))
-		strcpy(tmp, PQgetvalue(res, sql_result->current_row, field));
+	if ((tmp = calloc(sizeof(char), PQgetlength(res, sql_result->current_row_num, field) + 1)))
+		strcpy(tmp, PQgetvalue(res, sql_result->current_row_num, field));
 	else
 		LOG_ERROR_MESSAGE("dbt2_sql_getvalue: CALLOC FAILED for value from field=%d\n", field);
 	return tmp;
@@ -368,7 +368,7 @@ pgsql_dbc_set_option(const char *optname, const char *optvalue)
 	return OK;
 }
 
-struct dbc_sql_operation_t pgsql_sql_operation =
+static struct dbc_sql_operation_t pgsql_sql_operation =
 {
 	pgsql_db_init,
 	pgsql_connect_to_db,

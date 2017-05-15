@@ -8,11 +8,18 @@ extern int pgsql_dbc_init();
 #ifdef ENABLE_KINGBASE
 extern int kingbase_dbc_init();
 #endif
+#ifdef ENABLE_MYSQL
+extern int mysql_dbc_init();
+#endif
+
 struct dbc_construct_t dbc_constructs[] =
 {
 	{pgsql_dbc_init},
 #ifdef ENABLE_KINGBASE
 	{kingbase_dbc_init},
+#endif
+#ifdef ENABLE_MYSQL
+	{mysql_dbc_init},
 #endif
 	{NULL},
 };

@@ -166,7 +166,7 @@ kingbase_sql_execute(struct db_context_t *_dbc, char * query, struct sql_result_
 	else
 	{
 		sql_result->result_set = res;
-		sql_result->current_row = -1;
+		sql_result->current_row_num = -1;
 		sql_result->num_rows = KCIResultGetRowCount(res);
 	}
 
@@ -236,7 +236,7 @@ kingbase_sql_execute_prepared(
 	else
 	{
 		sql_result->result_set = res;
-		sql_result->current_row = -1;
+		sql_result->current_row_num = -1;
 		sql_result->num_rows = KCIResultGetRowCount(res);
 	}
 
@@ -247,8 +247,8 @@ static int
 kingbase_sql_fetchrow(struct db_context_t *_dbc, struct sql_result_t * sql_result)
 {
 	KCIResult *res = (KCIResult *)sql_result->result_set;
-	sql_result->current_row++;
-	if(sql_result->current_row >= KCIResultGetRowCount(res))
+	sql_result->current_row_num++;
+	if(sql_result->current_row_num >= KCIResultGetRowCount(res))
 		return 0;
 	return 1;
 }
@@ -266,17 +266,17 @@ kingbase_sql_getvalue(struct db_context_t *_dbc, struct sql_result_t * sql_resul
 {
 	KCIResult *res = (KCIResult *)sql_result->result_set;
 	char *tmp = NULL;
-	if (sql_result->current_row < 0 ||sql_result->current_row >= KCIResultGetRowCount(res) || field > KCIResultGetColumnCount(res))
+	if (sql_result->current_row_num < 0 ||sql_result->current_row_num >= KCIResultGetRowCount(res) || field > KCIResultGetColumnCount(res))
 	{
 #ifdef DEBUG_QUERY
 		LOG_ERROR_MESSAGE("kingbase_sql_getvalue: POSSIBLE NULL VALUE or ERROR\n\nRow: %d, Field: %d",
-						  sql_result->current_row, field);
+						  sql_result->current_row_num, field);
 #endif
 	return tmp;
 	}
 
-	if ((tmp = calloc(sizeof(char), KCIResultGetColumnValueLength(res, sql_result->current_row, field) + 1)))
-		strcpy(tmp, KCIResultGetColumnValue(res, sql_result->current_row, field));
+	if ((tmp = calloc(sizeof(char), KCIResultGetColumnValueLength(res, sql_result->current_row_num, field) + 1)))
+		strcpy(tmp, KCIResultGetColumnValue(res, sql_result->current_row_num, field));
 	else
 		LOG_ERROR_MESSAGE("dbt2_sql_getvalue: CALLOC FAILED for value from field=%d\n", field);
 	return tmp;

@@ -60,6 +60,29 @@ if test x$kingbase = xyes
 then
 	AC_DEFINE(ENABLE_KINGBASE, 1, [enable kingbase support.])
 fi
+
+mysql=no
+AC_ARG_WITH(mysql,
+    [  --with-mysql     enable mysql support],
+    [
+        case "$withval" in
+        y | ye | yes)
+	  mysql=yes
+	  AC_CHECK_PROGS(PGCONFIG, mysql_config)
+	  MYSQL_INCLUDE_DIR=`mysql_config --include`
+	  MYSQL_LIBS=`mysql_config --libs`
+	AC_SUBST(MYSQL_INCLUDE_DIR)
+	AC_SUBST(MYSQL_LIBS)
+          ;;
+        esac
+    ])
+
+AM_CONDITIONAL([ENABLE_MYSQL], [test x$mysql = xyes])
+if test x$mysql = xyes
+then
+	AC_DEFINE(ENABLE_MYSQL, 1, [enable mysql support.])
+fi
+
 # Checks for libraries.
 AC_CHECK_LIB([m], [pow])
 
@@ -83,6 +106,7 @@ AC_CONFIG_FILES(
 	src/dbc/Makefile
 	src/dbc/pgsql/Makefile
 	src/dbc/kingbase/Makefile
+	src/dbc/mysql/Makefile
 	src/simple/Makefile
 	src/extended/Makefile
 	src/storeproc/Makefile
