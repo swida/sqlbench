@@ -13,20 +13,24 @@ AC_PROG_RANLIB
 AM_PROG_CC_C_O
 
 postgresql=no
-AC_ARG_WITH(pgsql,
+AC_ARG_WITH(postgresql,
     [  --with-postgresql=yes|DIR     site header files for PostgreSQL in DIR],
     [
         case "$withval" in
         "" | y | ye | yes)
-	  AC_CHECK_PROGS(PGCONFIG, pg_config, [
-	  AC_MSG_ERROR([*** Command pg_config not found, you can supply an argument to the --with-postgresql option.
-	  ])])
-	  PGSQL_INCLUDE_DIR=`pg_config --includedir`
-	  PGSQL_LIB_DIR=`pg_config --libdir`
+	  AC_CHECK_PROGS(PG_CONFIG, pg_config)
+
+	  if test -z "$PG_CONFIG"
+	  then
+		AC_MSG_ERROR([*** Command pg_config not found, you can supply the site path to the --with-postgresql option.])
+	  fi
+
+	  PGSQL_INCLUDE_DIR=`$PG_CONFIG --includedir`
+	  PGSQL_LIB_DIR=`$PG_CONFIG --libdir`
           ;;
 	*)
-        PGSQL_INCLUDE_DIR="$withval"/include
-        PGSQL_LIB_DIR="$withval"/lib
+        PGSQL_INCLUDE_DIR="$withval/include"
+        PGSQL_LIB_DIR="$withval/lib"
 	;;
         esac
 	postgresql=yes
@@ -48,9 +52,13 @@ AC_ARG_WITH(mysql,
         case "$withval" in
         ""| y | ye | yes)
 	  mysql=yes
-	  AC_CHECK_PROGS(MYSQLCONFIG, mysql_config)
-	  MYSQL_INCLUDE_DIR=`mysql_config --include`
-	  MYSQL_LIBS=`mysql_config --libs`
+	  AC_CHECK_PROGS(MYSQL_CONFIG, mysql_config)
+	  if test -z "$MYSQL_CONFIG"
+	  then
+		AC_MSG_ERROR([*** Command mysql_config not found, you can supply the site path to the --with-mysql option.])
+	  fi
+	  MYSQL_INCLUDE_DIR=`$MYSQL_CONFIG --include`
+	  MYSQL_LIBS=`$MYSQL_CONFIG --libs`
 	  ;;
 	  *)
 	  MYSQL_INCLUDE_DIR="${withval}/include"
@@ -70,7 +78,7 @@ fi
 
 kingbase=no
 AC_ARG_WITH(kingbase,
-    [  --with-kingbase=DIR     site header files for Kingbase in DIR],
+    [  --with-kingbase=DIR     site header and library files for Kingbase in DIR],
     [
         case "$withval" in
         y | ye | yes)
