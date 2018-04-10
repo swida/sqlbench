@@ -66,7 +66,7 @@ pgsql_connect_to_db(struct db_context_t *_dbc)
 	int index = 0;
 
 	/* speical case: dbname is conninfo string */
-	if (dbname[0] != '\0' && strchr(dbname[0], '=') != NULL)
+	if (dbname[0] != NULL && strchr(dbname[0], '=') != NULL)
 	{
 		/* just conninfo string case support connect to multi-instance
 		 * database */

@@ -1,1 +1,9 @@
-SUBDIRS = pgsql kingbase
+SUBDIRS =
+
+if ENABLE_POSTGRESQL
+SUBDIRS += pgsql
+endif
+
+if ENABLE_KINGBASE
+SUBDIRS += kingbase
+endif

@@ -14,7 +14,9 @@ extern int mysql_dbc_init();
 
 struct dbc_construct_t dbc_constructs[] =
 {
+#ifdef ENABLE_POSTGRESQL
 	{pgsql_dbc_init},
+#endif
 #ifdef ENABLE_KINGBASE
 	{kingbase_dbc_init},
 #endif
