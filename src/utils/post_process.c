@@ -31,7 +31,6 @@ const char transaction_name[][14] =
 
 FILE *fp_mix_log = NULL;
 int fd_output = -1;
-int output_binary = 0;
 
 /* timestamp,transaction type,transaction status,response time */
 #define split_mixlog_line(tim,ttype,tstatus,rt) \
@@ -78,16 +77,17 @@ struct transaction_stat_data
 
 void usage(const char* progname)
 {
-	printf("usage: %s [-l mix.log] [-n] [-t transaction-rate.log]\n", progname);
-	printf("-l mix.log\n");
+	printf("Usage: %s [-l mix.log] [-n] [-t transaction-rate.log]\n", progname);
+	printf("Post process for sqlbench test data.\n\n");
+	printf("-l, --mix-log=mix.log\n");
 	printf("\tmix log file, use stdin if not be given\n");
-	printf("-t transaction-rate.log\n");
-	printf("\tgenerate transacation rate file\n");
-	printf("-u [host:port]\n");
+	printf("-t, --transaction-rate-file=transaction-rate.log\n");
+	printf("\tgenerates transaction rate file\n");
+	printf("-u, --send-to-url=host[:port]\n");
 	printf("\tsend sample data to a remote process through TCP.\n");
-	printf("-n\n");
+	printf("-n, --no-mark-scan\n");
 	printf("\tnot scan start mark\n");
-	printf("-h\n");
+	printf("-h, --help\n");
 	printf("\tprint this usage\n");
 }
 
@@ -147,50 +147,36 @@ sample_transaction_rate(struct transaction_stat_data *ts, int ttype_idx)
 	static int j = 0;
 	char buf[256];
 	unsigned int nlval;
+	int len;
 
 	if(ts->last_timestamp == UINT32_MAX)
 		ts->last_timestamp = ts->timestamp;
 
 	ts->rate_sample[ttype_idx][j]++;
 
-	if(ts->last_timestamp != ts->timestamp)
+	if(ts->last_timestamp == ts->timestamp)
+		return;
+
+	len = sprintf(buf, "%u", ts->last_timestamp);
+
+	for(t = 0; t < TRANSACTION_MAX; t++)
 	{
-		int len;
-		if(output_binary)
-		{
-			nlval = htonl(ts->last_timestamp);
-			memcpy(buf, &nlval, sizeof(nlval));
-			len = sizeof(nlval);
-		}else
-			len = sprintf(buf, "%u", ts->last_timestamp);
-
-		for(t = 0; t < TRANSACTION_MAX; t++)
-		{
-			ts->rate[t][1] = ts->rate[t][0] +
-				ts->rate_sample[t][j] - ts->forget_rate_sample[t];
-			ts->rate[t][0] = ts->rate[t][1];
-			if(output_binary)
-			{
-				nlval = htonl(ts->rate[t][1]);
-				memcpy(buf + len, &nlval, sizeof(nlval));
-				len += sizeof(nlval);
-			}
-			else
-				len += sprintf(buf + len, " %d", ts->rate[t][1]);
-		}
-		if(!output_binary)
-			buf[len++] = '\n';
-		write(fd_output, buf, len);
-		j++;
-
-		j %= SAMPLE_LENGTH;
-		for(t = 0; t < TRANSACTION_MAX; t++)
-		{
-			ts->forget_rate_sample[t] = ts->rate_sample[t][j];
-			ts->rate_sample[t][j] = 0;
-		}
-		ts->last_timestamp = ts->timestamp;
+		ts->rate[t][1] = ts->rate[t][0] +
+			ts->rate_sample[t][j] - ts->forget_rate_sample[t];
+		ts->rate[t][0] = ts->rate[t][1];
+		len += sprintf(buf + len, " %d", ts->rate[t][1]);
 	}
+	buf[len++] = '\n';
+	write(fd_output, buf, len);
+	j++;
+
+	j %= SAMPLE_LENGTH;
+	for(t = 0; t < TRANSACTION_MAX; t++)
+	{
+		ts->forget_rate_sample[t] = ts->rate_sample[t][j];
+		ts->rate_sample[t][j] = 0;
+	}
+	ts->last_timestamp = ts->timestamp;
 }
 
 void
@@ -313,7 +299,13 @@ int main(int argc, char *argv[])
 
 	while (1) {
 		int option_index = 0;
-		struct option long_options[] = {{0, 0, 0, 0}};
+		struct option long_options[] = {
+			{"help", no_argument, 0, 'h'},
+			{"mix-log", required_argument, 0, 'l'},
+			{"no-start-scan", no_argument, 0, 'n'},
+			{"transaction-rate-file", required_argument, 0, 't'},
+			{"send-to-address", required_argument, 0, 'u'}
+		};
 		int c = getopt_long(argc, argv, "hl:nt:u:",
 			long_options, &option_index);
 		if (c == -1) {
@@ -389,7 +381,6 @@ int main(int argc, char *argv[])
 		if (fd_output == -1)
 			return 1;
 		follow_mode = 1;
-		output_binary = 1;
 	}
 
 	/* initialize response time array */
