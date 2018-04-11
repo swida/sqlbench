@@ -77,12 +77,17 @@ struct transaction_stat_data
 
 void usage(const char* progname)
 {
+	int i;
+
 	printf("Usage: %s [-l mix.log] [-n] [-t transaction-rate.log]\n", progname);
 	printf("Post process for sqlbench test data.\n\n");
 	printf("-l, --mix-log=mix.log\n");
 	printf("\tmix log file, use stdin if not be given\n");
 	printf("-t, --transaction-rate-file=transaction-rate.log\n");
-	printf("\tgenerates transaction rate file\n");
+	printf("\tgenerates transaction rate file,\n\tcolumns: Time");
+	for(i = 0; i < sizeof(transaction_name) / sizeof(transaction_name[0]); i++)
+		printf(", %s", transaction_name[i]);
+	printf("\n");
 	printf("-u, --send-to-url=host[:port]\n");
 	printf("\tsend sample data to a remote process through TCP.\n");
 	printf("-n, --no-mark-scan\n");
