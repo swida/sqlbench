@@ -2,7 +2,7 @@
 #include "dbc.h"
 #include "common.h"
 #include <string.h>
-
+#include <stdarg.h>
 
 extern int pgsql_dbc_init();
 #ifdef ENABLE_KINGBASE
@@ -293,6 +293,35 @@ int dbc_execsp_stock_level (struct db_context_t *dbc, struct stock_level_t *data
 	assert(sop);
 	return (*(sop->exec_sp_stock_level))(dbc, data);
 }
+
+struct loader_stream_t *dbc_open_loader_stream(struct db_context_t *dbc,
+												  char *table_name, char delimiter, char *null_str)
+{
+  assert(_dbc_info);
+  struct dbc_loader_operation_t *lop = _dbc_info->dbc_loader_operation;
+  assert(lop);
+  return (*(lop->open_loader_stream))(dbc, table_name, delimiter, null_str);
+}
+
+int dbc_write_to_loader_stream(struct loader_stream_t *stream, const char *fmt, va_list ap)
+{
+  int res;
+  assert(_dbc_info);
+  struct dbc_loader_operation_t *lop = _dbc_info->dbc_loader_operation;
+  assert(lop);
+  res = (*(lop->write_to_stream))(stream, fmt, ap);
+
+  return res;
+}
+
+void dbc_close_loader_stream(struct loader_stream_t *stream)
+{
+	assert(_dbc_info);
+	struct dbc_loader_operation_t *lop = _dbc_info->dbc_loader_operation;
+	assert(lop);
+	(*(lop->close_loader_stream))(stream);
+}
+
 
 struct sqlapi_operation_t storeproc_sqlapi_operation =
 {

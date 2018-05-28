@@ -8,29 +8,43 @@
  * Based on TPC-C Standard Specification Revision 5.0.
  */
 
-#include "common.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
 #include <getopt.h>
+#include <stdarg.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
 
 #include <pthread.h>
+#include "common.h"
+#include "db.h"
+#include "dbc.h"
+#include "logging.h"
 
 #define DATAFILE_EXT ".data"
-#define ENV_SQL_CLIENT_NAME "SQL_CLIENT_PROGRAM"
-#define DEFAULT_SQL_CLIENT "psql"
+#define ENV_DBCLIENT_NAME "DGEN_DBCLIENT_COMMAND"
 
-#define MODE_FLAT 0
-#define MODE_DIRECT 1
+typedef union output_stream_t
+{
+	FILE *file;
+	struct loader_stream_t *stream;
+} output_stream;
 
-FILE *open_output_stream(int worker_id, char *table_name);
+struct stream_operation_t
+{
+	output_stream (*open_stream)(int worker_id, char *table_name);
+	int (*write_to_stream)(output_stream stream, const char *fmt, va_list ap);
+	void (*close_stream)(output_stream stream);
+};
+
+static output_stream open_file_stream(int worker_id, char *table_name);
+static int write_to_file_stream(output_stream stream, const char *fmt, va_list ap);
+static void close_file_stream(output_stream stream);
 
 void gen_customers(int worker_id, int start, int end);
 void gen_districts(int worker_id, int start, int end);
@@ -41,6 +55,12 @@ void gen_orders(int worker_id, int start, int end);
 void gen_stock(int worker_id, int start, int end);
 void gen_warehouses(int worker_id, int start, int end);
 
+struct stream_operation_t stream_operation = {
+	open_file_stream,
+	write_to_file_stream,
+	close_file_stream
+};
+
 int warehouses = 0;
 int customers = CUSTOMER_CARDINALITY;
 int items = ITEM_CARDINALITY;
@@ -49,24 +69,9 @@ int new_orders = NEW_ORDER_CARDINALITY;
 
 int jobs = 1;
 
-int mode_load = MODE_FLAT;
-
 char delimiter = ',';
 char null_str[16] = "\"NULL\"";
-
-char *sql_client = DEFAULT_SQL_CLIENT;
-
-#define ERR_MSG( fn ) { (void)fflush(stderr); \
-		(void)fprintf(stderr, __FILE__ ":%d:" #fn ": %s\n", \
-		__LINE__, strerror(errno)); }
-#define METAPRINTF( args ) if( fprintf args < 0  ) ERR_MSG( fn )
-
-/* Oh my gosh, is there a better way to do this? */
-#define FPRINTF(a, b, c) \
-	METAPRINTF((a, b, c));
-
-#define FPRINTF2(a, b) \
-		METAPRINTF((a, b));
+char *dbclient_command = NULL;
 
 void escape_me(char *str)
 {
@@ -86,72 +91,107 @@ void escape_me(char *str)
 	}
 }
 
-void print_timestamp(FILE *ofile, struct tm *date)
+static int is_valid_stream(output_stream stream)
 {
-	METAPRINTF((ofile, "%04d-%02d-%02d %02d:%02d:%02d",
+	return stream.stream != NULL;
+}
+
+static output_stream open_output_stream(int worker_id, char *table_name)
+{
+	return (*stream_operation.open_stream)(worker_id, table_name);
+}
+
+static int ostprintf(output_stream stream, const char *fmt, ...)
+{
+	int res;
+	va_list args;
+	va_start(args, fmt);
+	res = (*stream_operation.write_to_stream)(stream, fmt, args);
+	va_end(args);
+	return res;
+}
+
+static void close_output_stream(output_stream stream)
+{
+	return (*stream_operation.close_stream)(stream);
+}
+
+output_stream open_file_stream(int worker_id, char *table_name)
+{
+	char buf[1024] = "\0";
+	output_stream ost;
+
+	if (dbclient_command)
+		snprintf(buf, sizeof(buf), "%s %s %c %s",
+				 dbclient_command, table_name, delimiter, null_str);
+	else if(strlen(output_path) > 0)
+	{
+		strcpy(buf, output_path);
+		strcat(buf, "/");
+	}
+
+	snprintf(buf, sizeof(buf), "%s%s%d%s", buf, table_name, worker_id, DATAFILE_EXT);
+	ost.file = dbclient_command ? popen(buf, "w") : fopen(buf, "w");
+
+	if (ost.file == NULL)
+		printf("cannot open file or program for table %s\n", table_name);
+
+	return ost;
+}
+
+static int write_to_file_stream(output_stream stream, const char *fmt, va_list ap)
+{
+	return vfprintf(stream.file, fmt, ap);
+}
+
+static void close_file_stream(output_stream stream)
+{
+	fclose(stream.file);
+}
+
+output_stream open_dbloader_stream(int worker_id, char *table_name)
+{
+	output_stream ost;
+	struct db_context_t *dbc = db_init();
+
+	ost.stream = NULL;
+
+	if (connect_to_db(dbc) != OK) {
+		printf("cannot establish a database connection\n");
+		return ost;
+	}
+
+	if ((ost.stream = dbc_open_loader_stream(dbc, table_name, delimiter, null_str)) == NULL)
+		LOG_ERROR_MESSAGE("could not open loader stream to database");
+
+	return ost;
+}
+
+static int write_to_dbloader_stream(output_stream stream, const char *fmt, va_list ap)
+{
+	return dbc_write_to_loader_stream(stream.stream, fmt, ap);
+}
+
+static void close_dbloader_stream(output_stream stream)
+{
+	struct db_context_t *dbc = stream.stream->dbc;
+
+	dbc_close_loader_stream(stream.stream);
+	disconnect_from_db(dbc);
+	free(dbc);
+}
+
+void print_timestamp(output_stream stream, struct tm *date)
+{
+	ostprintf(stream, "%04d-%02d-%02d %02d:%02d:%02d",
 				date->tm_year + 1900, date->tm_mon + 1, date->tm_mday,
-				date->tm_hour, date->tm_min, date->tm_sec));
-}
-
-FILE *open_output_stream(int worker_id, char *table_name)
-{
-	FILE *output;
-	char filename[1024] = "\0";
-
-	if (mode_load == MODE_FLAT) {
-		if (strlen(output_path) > 0) {
-			strcpy(filename, output_path);
-			strcat(filename, "/");
-		}
-		sprintf(filename, "%s%s%d%s", filename, table_name, worker_id, DATAFILE_EXT);
-		output = fopen(filename, "w");
-		if (output == NULL) {
-			printf("cannot open %s\n", table_name);
-			return NULL;
-		}
-	} else if (mode_load == MODE_DIRECT) {
-		output = popen(sql_client, "w");
-		if (output == NULL) {
-			printf("error cannot open pipe for direct load\n");
-			return NULL;
-		}
-		/* FIXME: Handle properly instead of blindly reading the output. */
-		while (fgetc(output) != EOF) ;
-
-		fprintf(output, "BEGIN;\n");
-		/* FIXME: Handle properly instead of blindly reading the output. */
-		while (fgetc(output) != EOF) ;
-
-		fprintf(output,
-				"COPY %s FROM STDIN DELIMITER '%c' NULL '%s';\n",
-				table_name, delimiter, null_str);
-		/* FIXME: Handle properly instead of blindly reading the output. */
-		while (fgetc(output) != EOF) ;
-	}
-	return output;
-}
-
-void close_output_stream(FILE *output)
-{
-	if (mode_load == MODE_FLAT) {
-		fclose(output);
-	} else {
-		fprintf(output, "\\.\n");
-		/* FIXME: Handle properly instead of blindly reading the output. */
-		while (fgetc(output) != EOF) ;
-
-		fprintf(output, "COMMIT;\n");
-		/* FIXME: Handle properly instead of blindly reading the output. */
-		while (fgetc(output) != EOF) ;
-
-		pclose(output);
-	}
+				date->tm_hour, date->tm_min, date->tm_sec);
 }
 
 /* Clause 4.3.3.1 */
 void gen_customers(int worker_id, int start, int end)
 {
-	FILE *output;
+	output_stream output;
 	int i, j, k;
 	char a_string[1024];
 	struct tm *tm1;
@@ -161,33 +201,33 @@ void gen_customers(int worker_id, int start, int end)
 	printf("Generating customer table data...\n");
 
 	output = open_output_stream(worker_id, "customer");
-	if(output == NULL)
+	if (!is_valid_stream(output))
 		return;
 
 	for (i = start; i <= end; i++) {
 		for (j = 0; j < DISTRICT_CARDINALITY; j++) {
 			for (k = 0; k < customers; k++) {
 				/* c_id */
-				FPRINTF(output, "%d", k + 1);
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%d", k + 1);
+				ostprintf(output, "%c", delimiter);
 
 				/* c_d_id */
-				FPRINTF(output, "%d", j + 1);
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%d", j + 1);
+				ostprintf(output, "%c", delimiter);
 
 				/* c_w_id */
-				FPRINTF(output, "%d", i);
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%d", i);
+				ostprintf(output, "%c", delimiter);
 
 				/* c_first */
 				get_a_string(a_string, 8, 16);
 				escape_me(a_string);
-				FPRINTF(output, "%s", a_string);
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%s", a_string);
+				ostprintf(output, "%c", delimiter);
 
 				/* c_middle */
-				FPRINTF2(output, "OE");
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "OE");
+				ostprintf(output, "%c", delimiter);
 
 				/* c_last Clause 4.3.2.7 */
 				if (k < 1000) {
@@ -196,41 +236,41 @@ void gen_customers(int worker_id, int start, int end)
 					get_c_last(a_string, get_nurand(255, 0, 999));
 				}
 				escape_me(a_string);
-				FPRINTF(output, "%s", a_string);
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%s", a_string);
+				ostprintf(output, "%c", delimiter);
 
 				/* c_street_1 */
 				get_a_string(a_string, 10, 20);
 				escape_me(a_string);
-				FPRINTF(output, "%s", a_string);
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%s", a_string);
+				ostprintf(output, "%c", delimiter);
 
 				/* c_street_2 */
 				get_a_string(a_string, 10, 20);
 				escape_me(a_string);
-				FPRINTF(output, "%s", a_string);
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%s", a_string);
+				ostprintf(output, "%c", delimiter);
 
 				/* c_city */
 				get_a_string(a_string, 10, 20);
 				escape_me(a_string);
-				FPRINTF(output, "%s", a_string);
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%s", a_string);
+				ostprintf(output, "%c", delimiter);
 
 				/* c_state */
 				get_l_string(a_string, 2, 2);
-				FPRINTF(output, "%s", a_string);
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%s", a_string);
+				ostprintf(output, "%c", delimiter);
 
 				/* c_zip */
 				get_n_string(a_string, 4, 4);
-				FPRINTF(output, "%s11111", a_string);
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%s11111", a_string);
+				ostprintf(output, "%c", delimiter);
 
 				/* c_phone */
 				get_n_string(a_string, 16, 16);
-				FPRINTF(output, "%s", a_string);
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%s", a_string);
+				ostprintf(output, "%c", delimiter);
 
 				/* c_since */
 				/*
@@ -241,46 +281,46 @@ void gen_customers(int worker_id, int start, int end)
 				time(&t1);
 				tm1 = localtime(&t1);
 				print_timestamp(output, tm1);
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%c", delimiter);
 
 				/* c_credit */
 				if (get_percentage() < .10) {
-					FPRINTF2(output, "BC");
+					ostprintf(output, "BC");
 				} else {
-					FPRINTF2(output, "GC");
+					ostprintf(output, "GC");
 				}
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%c", delimiter);
 
 				/* c_credit_lim */
-				FPRINTF2(output, "50000.00");
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "50000.00");
+				ostprintf(output, "%c", delimiter);
 
 				/* c_discount */
-				FPRINTF(output, "0.%04d", get_random(5000));
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "0.%04d", get_random(5000));
+				ostprintf(output, "%c", delimiter);
 
 				/* c_balance */
-				FPRINTF2(output, "-10.00");
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "-10.00");
+				ostprintf(output, "%c", delimiter);
 
 				/* c_ytd_payment */
-				FPRINTF2(output, "10.00");
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "10.00");
+				ostprintf(output, "%c", delimiter);
 
 				/* c_payment_cnt */
-				FPRINTF2(output, "1");
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "1");
+				ostprintf(output, "%c", delimiter);
 
 				/* c_delivery_cnt */
-				FPRINTF2(output, "0");
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "0");
+				ostprintf(output, "%c", delimiter);
 
 				/* c_data */
 				get_a_string(a_string, 300, 500);
 				escape_me(a_string);
-				FPRINTF(output, "%s", a_string);
+				ostprintf(output, "%s", a_string);
 
-				METAPRINTF((output, "\n"));
+				ostprintf(output, "\n");
 			}
 		}
 	}
@@ -294,7 +334,7 @@ void gen_customers(int worker_id, int start, int end)
 /* Clause 4.3.3.1 */
 void gen_districts(int worker_id, int start, int end)
 {
-	FILE *output;
+	output_stream output;
 	int i, j;
 	char a_string[48];
 
@@ -302,65 +342,65 @@ void gen_districts(int worker_id, int start, int end)
 	printf("Generating district table data...\n");
 
 	output = open_output_stream(worker_id, "district");
-	if(output == NULL)
+	if (!is_valid_stream(output))
 		return;
 
 	for (i = start; i <= end; i++) {
 		for (j = 0; j < DISTRICT_CARDINALITY; j++) {
 			/* d_id */
-			FPRINTF(output, "%d", j + 1);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%d", j + 1);
+			ostprintf(output, "%c", delimiter);
 
 			/* d_w_id */
-			FPRINTF(output, "%d", i);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%d", i);
+			ostprintf(output, "%c", delimiter);
 
 			/* d_name */
 			get_a_string(a_string, 6, 10);
 			escape_me(a_string);
-			FPRINTF(output, "%s", a_string);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%s", a_string);
+			ostprintf(output, "%c", delimiter);
 
 			/* d_street_1 */
 			get_a_string(a_string, 10, 20);
 			escape_me(a_string);
-			FPRINTF(output, "%s", a_string);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%s", a_string);
+			ostprintf(output, "%c", delimiter);
 
 			/* d_street_2 */
 			get_a_string(a_string, 10, 20);
 			escape_me(a_string);
-			FPRINTF(output, "%s", a_string);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%s", a_string);
+			ostprintf(output, "%c", delimiter);
 
 			/* d_city */
 			get_a_string(a_string, 10, 20);
 			escape_me(a_string);
-			FPRINTF(output, "%s", a_string);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%s", a_string);
+			ostprintf(output, "%c", delimiter);
 
 			/* d_state */
 			get_l_string(a_string, 2, 2);
-			FPRINTF(output, "%s", a_string);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%s", a_string);
+			ostprintf(output, "%c", delimiter);
 
 			/* d_zip */
 			get_n_string(a_string, 4, 4);
-			FPRINTF(output, "%s11111", a_string);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%s11111", a_string);
+			ostprintf(output, "%c", delimiter);
 
 			/* d_tax */
-			FPRINTF(output, "0.%04d", get_random(2000));
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "0.%04d", get_random(2000));
+			ostprintf(output, "%c", delimiter);
 
 			/* d_ytd */
-			FPRINTF2(output, "30000.00");
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "30000.00");
+			ostprintf(output, "%c", delimiter);
 
 			/* d_next_o_id */
-			FPRINTF2(output, "3001");
+			ostprintf(output, "3001");
 
-			METAPRINTF((output, "\n"));
+			ostprintf(output, "\n");
 		}
 	}
 
@@ -373,7 +413,7 @@ void gen_districts(int worker_id, int start, int end)
 /* Clause 4.3.3.1 */
 void gen_history(int worker_id, int start, int end)
 {
-	FILE *output;
+	output_stream output;
 	int i, j, k;
 	char a_string[64];
 	struct tm *tm1;
@@ -383,31 +423,32 @@ void gen_history(int worker_id, int start, int end)
 	printf("Generating history table data...\n");
 
 	output = open_output_stream(worker_id, "history");
-	if(output == NULL)
+
+	if(!is_valid_stream(output))
 		return;
 
 	for (i = start; i <= end; i++) {
 		for (j = 0; j < DISTRICT_CARDINALITY; j++) {
 			for (k = 0; k < customers; k++) {
 				/* h_c_id */
-				FPRINTF(output, "%d", k + 1);
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%d", k + 1);
+				ostprintf(output, "%c", delimiter);
 
 				/* h_c_d_id */
-				FPRINTF(output, "%d", j + 1);
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%d", j + 1);
+				ostprintf(output, "%c", delimiter);
 
 				/* h_c_w_id */
-				FPRINTF(output, "%d", i);
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%d", i);
+				ostprintf(output, "%c", delimiter);
 
 				/* h_d_id */
-				FPRINTF(output, "%d", j + 1);
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%d", j + 1);
+				ostprintf(output, "%c", delimiter);
 
 				/* h_w_id */
-				FPRINTF(output, "%d", i);
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%d", i);
+				ostprintf(output, "%c", delimiter);
 
 				/* h_date */
 				/*
@@ -418,18 +459,18 @@ void gen_history(int worker_id, int start, int end)
 				time(&t1);
 				tm1 = localtime(&t1);
 				print_timestamp(output, tm1);
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%c", delimiter);
 
 				/* h_amount */
-				FPRINTF2(output, "10.00");
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "10.00");
+				ostprintf(output, "%c", delimiter);
 
 				/* h_data */
 				get_a_string(a_string, 12, 24);
 				escape_me(a_string);
-				FPRINTF(output, "%s", a_string);
+				ostprintf(output, "%s", a_string);
 
-				METAPRINTF((output, "\n"));
+				ostprintf(output, "\n");
 			}
 		}
 	}
@@ -443,7 +484,7 @@ void gen_history(int worker_id, int start, int end)
 /* Clause 4.3.3.1 */
 void gen_items()
 {
-	FILE *output;
+	output_stream output;
 	int i;
 	char a_string[128];
 	int j;
@@ -452,27 +493,28 @@ void gen_items()
 	printf("Generating item table data...\n");
 
 	output = open_output_stream(0, "item");
-	if(output == NULL)
+
+	if(!is_valid_stream(output))
 		return;
 
 	for (i = 0; i < items; i++) {
 		/* i_id */
-		FPRINTF(output, "%d", i + 1);
-		METAPRINTF((output, "%c", delimiter));
+		ostprintf(output, "%d", i + 1);
+		ostprintf(output, "%c", delimiter);
 
 		/* i_im_id */
-		FPRINTF(output, "%d", get_random(9999) + 1);
-		METAPRINTF((output, "%c", delimiter));
+		ostprintf(output, "%d", get_random(9999) + 1);
+		ostprintf(output, "%c", delimiter);
 
 		/* i_name */
 		get_a_string(a_string, 14, 24);
 		escape_me(a_string);
-		FPRINTF(output, "%s", a_string);
-		METAPRINTF((output, "%c", delimiter));
+		ostprintf(output, "%s", a_string);
+		ostprintf(output, "%c", delimiter);
 
 		/* i_price */
-		FPRINTF(output, "%0.2f", ((double) get_random(9900) + 100.0) / 100.0);
-		METAPRINTF((output, "%c", delimiter));
+		ostprintf(output, "%0.2f", ((double) get_random(9900) + 100.0) / 100.0);
+		ostprintf(output, "%c", delimiter);
 
 		/* i_data */
 		get_a_string(a_string, 26, 50);
@@ -481,9 +523,9 @@ void gen_items()
 			strncpy(a_string + j, "ORIGINAL", 8);
 		}
 		escape_me(a_string);
-		FPRINTF(output, "%s", a_string);
+		ostprintf(output, "%s", a_string);
 
-		METAPRINTF((output, "\n"));
+		ostprintf(output, "\n");
 	}
 
 	close_output_stream(output);
@@ -495,31 +537,31 @@ void gen_items()
 /* Clause 4.3.3.1 */
 void gen_new_orders(int worker_id, int start, int end)
 {
-	FILE *output;
+	output_stream output;
 	int i, j, k;
 
 	set_random_seed(0);
 	printf("Generating new-order table data...\n");
 
 	output = open_output_stream(worker_id, "new_order");
-	if(output == NULL)
+	if(!is_valid_stream(output))
 		return;
 
 	for (i = start; i <= end; i++) {
 		for (j = 0; j < DISTRICT_CARDINALITY; j++) {
 			for (k = orders - new_orders; k < orders; k++) {
 				/* no_o_id */
-				FPRINTF(output, "%d", k + 1);
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%d", k + 1);
+				ostprintf(output, "%c", delimiter);
 
 				/* no_d_id */
-				FPRINTF(output, "%d", j + 1);
-				METAPRINTF((output, "%c", delimiter));
+				ostprintf(output, "%d", j + 1);
+				ostprintf(output, "%c", delimiter);
 
 				/* no_w_id */
-				FPRINTF(output, "%d", i);
+				ostprintf(output, "%d", i);
 
-				METAPRINTF((output, "\n"));
+				ostprintf(output, "\n");
 			}
 		}
 	}
@@ -533,7 +575,7 @@ void gen_new_orders(int worker_id, int start, int end)
 /* Clause 4.3.3.1 */
 void gen_orders(int worker_id, int start, int end)
 {
-	FILE *order, *order_line;
+	output_stream order, order_line;
 	int i, j, k, l;
 	char a_string[64];
 	struct tm *tm1;
@@ -555,10 +597,11 @@ void gen_orders(int worker_id, int start, int end)
 	printf("Generating order and order-line table data...\n");
 
 	order = open_output_stream(worker_id, "orders");
-	if(order == NULL)
+
+	if(!is_valid_stream(order))
 		return;
 	order_line = open_output_stream(worker_id, "order_line");
-	if(order_line == NULL)
+	if(!is_valid_stream(order_line))
 		return;
 
 	for (i = start; i <= end; i++) {
@@ -601,20 +644,20 @@ void gen_orders(int worker_id, int start, int end)
 			current = head;
 			for (k = 0; k < orders; k++) {
 				/* o_id */
-				FPRINTF(order, "%d", k + 1);
-				METAPRINTF((order, "%c", delimiter));
+				ostprintf(order, "%d", k + 1);
+				ostprintf(order, "%c", delimiter);
 
 				/* o_d_id */
-				FPRINTF(order, "%d", j + 1);
-				METAPRINTF((order, "%c", delimiter));
+				ostprintf(order, "%d", j + 1);
+				ostprintf(order, "%c", delimiter);
 
 				/* o_w_id */
-				FPRINTF(order, "%d", i);
-				METAPRINTF((order, "%c", delimiter));
+				ostprintf(order, "%d", i);
+				ostprintf(order, "%c", delimiter);
 
 				/* o_c_id */
-				FPRINTF(order, "%d", current->value);
-				METAPRINTF((order, "%c", delimiter));
+				ostprintf(order, "%d", current->value);
+				ostprintf(order, "%c", delimiter);
 				current = current->next;
 
 				/* o_entry_d */
@@ -626,24 +669,24 @@ void gen_orders(int worker_id, int start, int end)
 				time(&t1);
 				tm1 = localtime(&t1);
 				print_timestamp(order, tm1);
-				METAPRINTF((order, "%c", delimiter));
+				ostprintf(order, "%c", delimiter);
 
 				if (k < 2101) {
-					FPRINTF(order, "%d", get_random(9) + 1);
+					ostprintf(order, "%d", get_random(9) + 1);
 				} else {
-					METAPRINTF((order, "%s", null_str));
+					ostprintf(order, "%s", null_str);
 				}
-				METAPRINTF((order, "%c", delimiter));
+				ostprintf(order, "%c", delimiter);
 
 				/* o_ol_cnt */
 				o_ol_cnt = get_random(10) + 5;
-				FPRINTF(order, "%d", o_ol_cnt);
-				METAPRINTF((order, "%c", delimiter));
+				ostprintf(order, "%d", o_ol_cnt);
+				ostprintf(order, "%c", delimiter);
 
 				/* o_all_local */
-				FPRINTF2(order, "1");
+				ostprintf(order, "1");
 
-				METAPRINTF((order, "\n"));
+				ostprintf(order, "\n");
 
 				/*
 				 * Generate data in the order-line table for
@@ -651,29 +694,29 @@ void gen_orders(int worker_id, int start, int end)
 				 */
 				for (l = 0; l < o_ol_cnt; l++) {
 					/* ol_o_id */
-					FPRINTF(order_line, "%d", k + 1);
-					METAPRINTF((order_line, "%c", delimiter));
+					ostprintf(order_line, "%d", k + 1);
+					ostprintf(order_line, "%c", delimiter);
 
 					/* ol_d_id */
-					FPRINTF(order_line, "%d", j + 1);
-					METAPRINTF((order_line, "%c", delimiter));
+					ostprintf(order_line, "%d", j + 1);
+					ostprintf(order_line, "%c", delimiter);
 
 					/* ol_w_id */
-					FPRINTF(order_line, "%d", i);
-					METAPRINTF((order_line, "%c", delimiter));
+					ostprintf(order_line, "%d", i);
+					ostprintf(order_line, "%c", delimiter);
 
 					/* ol_number */
-					FPRINTF(order_line, "%d", l + 1);
-					METAPRINTF((order_line, "%c", delimiter));
+					ostprintf(order_line, "%d", l + 1);
+					ostprintf(order_line, "%c", delimiter);
 
 					/* ol_i_id */
-					FPRINTF(order_line, "%d",
+					ostprintf(order_line, "%d",
 							get_random(ITEM_CARDINALITY - 1) + 1);
-					METAPRINTF((order_line, "%c", delimiter));
+					ostprintf(order_line, "%c", delimiter);
 
 					/* ol_supply_w_id */
-					FPRINTF(order_line, "%d", i);
-					METAPRINTF((order_line, "%c", delimiter));
+					ostprintf(order_line, "%d", i);
+					ostprintf(order_line, "%c", delimiter);
 
 					if (k < 2101) {
 						/*
@@ -686,29 +729,29 @@ void gen_orders(int worker_id, int start, int end)
 						tm1 = localtime(&t1);
 						print_timestamp(order_line, tm1);
 					} else {
-						METAPRINTF((order_line, "%s", null_str));
+						ostprintf(order_line, "%s", null_str);
 					}
 
-					METAPRINTF((order_line, "%c", delimiter));
+					ostprintf(order_line, "%c", delimiter);
 
 					/* ol_quantity */
-					FPRINTF2(order_line, "5");
-					METAPRINTF((order_line, "%c", delimiter));
+					ostprintf(order_line, "5");
+					ostprintf(order_line, "%c", delimiter);
 
 					/* ol_amount */
 					if (k < 2101) {
-						FPRINTF2(order_line, "0.00");
+						ostprintf(order_line, "0.00");
 					} else {
-						FPRINTF(order_line, "%f",
+						ostprintf(order_line, "%f",
 								(double) (get_random(999998) + 1) / 100.0);
 					}
-					METAPRINTF((order_line, "%c", delimiter));
+					ostprintf(order_line, "%c", delimiter);
 
 					/* ol_dist_info */
 					get_l_string(a_string, 24, 24);
-					FPRINTF(order_line, "%s", a_string);
+					ostprintf(order_line, "%s", a_string);
 
-					METAPRINTF((order_line, "\n"));
+					ostprintf(order_line, "\n");
 				}
 			}
 			while (head != NULL) {
@@ -728,7 +771,7 @@ void gen_orders(int worker_id, int start, int end)
 /* Clause 4.3.3.1 */
 void gen_stock(int worker_id, int start, int end)
 {
-	FILE *output;
+	output_stream output;
 	int i, j, k;
 	char a_string[128];
 
@@ -736,84 +779,84 @@ void gen_stock(int worker_id, int start, int end)
 	printf("Generating stock table data...\n");
 
 	output = open_output_stream(worker_id, "stock");
-	if(output == NULL)
+	if (!is_valid_stream(output))
 		return;
 
 	for (i = start; i <= end; i++) {
 		for (j = 0; j < items; j++) {
 			/* s_i_id */
-			FPRINTF(output, "%d", j + 1);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%d", j + 1);
+			ostprintf(output, "%c", delimiter);
 
 			/* s_w_id */
-			FPRINTF(output, "%d", i);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%d", i);
+			ostprintf(output, "%c", delimiter);
 
 			/* s_quantity */
-			FPRINTF(output, "%d", get_random(90) + 10);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%d", get_random(90) + 10);
+			ostprintf(output, "%c", delimiter);
 
 			/* s_dist_01 */
 			get_l_string(a_string, 24, 24);
-			FPRINTF(output, "%s", a_string);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%s", a_string);
+			ostprintf(output, "%c", delimiter);
 
 			/* s_dist_02 */
 			get_l_string(a_string, 24, 24);
-			FPRINTF(output, "%s", a_string);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%s", a_string);
+			ostprintf(output, "%c", delimiter);
 
 			/* s_dist_03 */
 			get_l_string(a_string, 24, 24);
-			FPRINTF(output, "%s", a_string);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%s", a_string);
+			ostprintf(output, "%c", delimiter);
 
 			/* s_dist_04 */
 			get_l_string(a_string, 24, 24);
-			FPRINTF(output, "%s", a_string);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%s", a_string);
+			ostprintf(output, "%c", delimiter);
 
 			/* s_dist_05 */
 			get_l_string(a_string, 24, 24);
-			FPRINTF(output, "%s", a_string);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%s", a_string);
+			ostprintf(output, "%c", delimiter);
 
 			/* s_dist_06 */
 			get_l_string(a_string, 24, 24);
-			FPRINTF(output, "%s", a_string);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%s", a_string);
+			ostprintf(output, "%c", delimiter);
 
 			/* s_dist_07 */
 			get_l_string(a_string, 24, 24);
-			FPRINTF(output, "%s", a_string);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%s", a_string);
+			ostprintf(output, "%c", delimiter);
 
 			/* s_dist_08 */
 			get_l_string(a_string, 24, 24);
-			FPRINTF(output, "%s", a_string);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%s", a_string);
+			ostprintf(output, "%c", delimiter);
 
 			/* s_dist_09 */
 			get_l_string(a_string, 24, 24);
-			FPRINTF(output, "%s", a_string);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%s", a_string);
+			ostprintf(output, "%c", delimiter);
 
 			/* s_dist_10 */
 			get_l_string(a_string, 24, 24);
-			FPRINTF(output, "%s", a_string);
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "%s", a_string);
+			ostprintf(output, "%c", delimiter);
 
 			/* s_ytd */
-			FPRINTF2(output, "0");
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "0");
+			ostprintf(output, "%c", delimiter);
 
 			/* s_order_cnt */
-			FPRINTF2(output, "0");
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "0");
+			ostprintf(output, "%c", delimiter);
 
 			/* s_remote_cnt */
-			FPRINTF2(output, "0");
-			METAPRINTF((output, "%c", delimiter));
+			ostprintf(output, "0");
+			ostprintf(output, "%c", delimiter);
 
 			/* s_data */
 			get_a_string(a_string, 26, 50);
@@ -822,9 +865,9 @@ void gen_stock(int worker_id, int start, int end)
 				strncpy(a_string + k, "ORIGINAL", 8);
 			}
 			escape_me(a_string);
-			FPRINTF(output, "%s", a_string);
+			ostprintf(output, "%s", a_string);
 
-			METAPRINTF((output, "\n"));
+			ostprintf(output, "\n");
 		}
 	}
 
@@ -837,7 +880,7 @@ void gen_stock(int worker_id, int start, int end)
 /* Clause 4.3.3.1 */
 void gen_warehouses(int worker_id, int start, int end)
 {
-	FILE *output;
+	output_stream output;
 	int i;
 	char a_string[48];
 
@@ -845,56 +888,56 @@ void gen_warehouses(int worker_id, int start, int end)
 	printf("Generating warehouse table data...\n");
 
 	output = open_output_stream(worker_id, "warehouse");
-	if(output == NULL)
+	if (!is_valid_stream(output))
 		return;
 
 	for (i = start; i <= end; i++) {
 		/* w_id */
-		FPRINTF(output, "%d", i);
-		METAPRINTF((output, "%c", delimiter));
+		ostprintf(output, "%d", i);
+		ostprintf(output, "%c", delimiter);
 
 		/* w_name */
 		get_a_string(a_string, 6, 10);
 		escape_me(a_string);
-		FPRINTF(output, "%s", a_string);
-		METAPRINTF((output, "%c", delimiter));
+		ostprintf(output, "%s", a_string);
+		ostprintf(output, "%c", delimiter);
 
 		/* w_street_1 */
 		get_a_string(a_string, 10, 20);
 		escape_me(a_string);
-		FPRINTF(output, "%s", a_string);
-		METAPRINTF((output, "%c", delimiter));
+		ostprintf(output, "%s", a_string);
+		ostprintf(output, "%c", delimiter);
 
 		/* w_street_2 */
 		get_a_string(a_string, 10, 20);
 		escape_me(a_string);
-		FPRINTF(output, "%s", a_string);
-		METAPRINTF((output, "%c", delimiter));
+		ostprintf(output, "%s", a_string);
+		ostprintf(output, "%c", delimiter);
 
 		/* w_city */
 		get_a_string(a_string, 10, 20);
 		escape_me(a_string);
-		FPRINTF(output, "%s", a_string);
-		METAPRINTF((output, "%c", delimiter));
+		ostprintf(output, "%s", a_string);
+		ostprintf(output, "%c", delimiter);
 
 		/* w_state */
 		get_l_string(a_string, 2, 2);
-		FPRINTF(output, "%s", a_string);
-		METAPRINTF((output, "%c", delimiter));
+		ostprintf(output, "%s", a_string);
+		ostprintf(output, "%c", delimiter);
 
 		/* w_zip */
 		get_n_string(a_string, 4, 4);
-		FPRINTF(output, "%s11111", a_string);
-		METAPRINTF((output, "%c", delimiter));
+		ostprintf(output, "%s11111", a_string);
+		ostprintf(output, "%c", delimiter);
 
 		/* w_tax */
-		FPRINTF(output, "0.%04d", get_random(2000));
-		METAPRINTF((output, "%c", delimiter));
+		ostprintf(output, "0.%04d", get_random(2000));
+		ostprintf(output, "%c", delimiter);
 
 		/* w_ytd */
-		FPRINTF2(output, "300000.00");
+		ostprintf(output, "300000.00");
 
-		METAPRINTF((output, "\n"));
+		ostprintf(output, "\n");
 	}
 
 	close_output_stream(output);
@@ -942,58 +985,104 @@ void *datagen_worker(void *data)
 	return NULL;
 }
 
+void usage(char *progname)
+{
+	fprintf(stderr, "usage: %s [-t <dbms>] -w # [-c #] [-i #] [-o #] [-s #] [-n #] [-j #] [-d <str>]\n", progname);
+	fprintf(stderr, "\n");
+	fprintf(stderr, "-t <dbms>\n");
+	fprintf(stderr, "\tavailable:%s\n", dbc_manager_get_dbcnames());
+	fprintf(stderr, "%s", dbc_manager_get_dbcusages());
+	fprintf(stderr, "\n");
+	fprintf(stderr, "-w #\n");
+	fprintf(stderr, "\twarehouse cardinality\n");
+	fprintf(stderr, "-c #\n");
+	fprintf(stderr, "\tcustomer cardinality, default %d\n", CUSTOMER_CARDINALITY);
+	fprintf(stderr, "-i #\n");
+	fprintf(stderr, "\titem cardinality, default %d\n", ITEM_CARDINALITY);
+	fprintf(stderr, "-o #\n");
+	fprintf(stderr, "\torder cardinality, default %d\n", ORDER_CARDINALITY);
+	fprintf(stderr, "-n #\n");
+	fprintf(stderr, "\tnew-order cardinality, default %d\n", NEW_ORDER_CARDINALITY);
+	fprintf(stderr, "-j #\n");
+	fprintf(stderr, "\tNumber of worker threads within datagen, default is %d\n", jobs);
+	fprintf(stderr, "-d <path>\n");
+	fprintf(stderr, "\toutput path of data files\n");
+	fprintf(stderr, "--direct\n");
+	fprintf(stderr, "\tdon't generate flat files, load directly into database\n");
+
+}
+
 int main(int argc, char *argv[])
 {
 	struct stat st;
-
-	/* For getoptlong(). */
+	struct db_context_t *dbc;
+	char dbms_name[16] = "";
+	struct option *dbms_long_options = NULL;
 	int c;
 	pthread_t *tid;
 	struct datagen_context_t *datagen_context;
 	int j;
 	int chunk, rem, curr_end;
 
-	init_common();
-
 	if (argc < 2) {
-		printf("Usage: %s -w # [-c #] [-i #] [-o #] [-s #] [-n #] [-j #] [-d <str>]\n",
-				argv[0]);
-		printf("\n");
-		printf("-w #\n");
-		printf("\twarehouse cardinality\n");
-		printf("-c #\n");
-		printf("\tcustomer cardinality, default %d\n", CUSTOMER_CARDINALITY);
-		printf("-i #\n");
-		printf("\titem cardinality, default %d\n", ITEM_CARDINALITY);
-		printf("-o #\n");
-		printf("\torder cardinality, default %d\n", ORDER_CARDINALITY);
-		printf("-n #\n");
-		printf("\tnew-order cardinality, default %d\n", NEW_ORDER_CARDINALITY);
-		printf("-j #\n");
-		printf("\tNumber of worker threads within datagen, default is %d\n", jobs);
-		printf("-d <path>\n");
-		printf("\toutput path of data files\n");
-		printf("--direct\n");
-		printf("\tdon't generate flat files, load directly into database\n");
+		usage(argv[0]);
 		return 1;
 	}
 
-	/* Parse command line arguments. */
-	while (1) {
+	init_common();
+	init_logging();
+	init_dbc_manager();
+
+	/* first stage choose dbms */
+	opterr = 0;
+	while(1) {
 		int option_index = 0;
+
 		static struct option long_options[] = {
-			{ "direct", no_argument, &mode_load, MODE_DIRECT },
 			{ 0, 0, 0, 0 }
 		};
-
-		c = getopt_long(argc, argv, "c:d:i:n:j:o:w:",
-				long_options, &option_index);
+		c = getopt_long(argc, argv, "t:", long_options, &option_index);
 		if (c == -1) {
 			break;
 		}
+		switch (c) {
+		case 't':
+			strncpy(dbms_name, optarg, sizeof(dbms_name));
+			goto parse_dbc_type_done;
+			break;
+		}
+	}
 
+parse_dbc_type_done:
+	if(dbms_name[0] != '\0')
+	{
+		if(dbc_manager_set(dbms_name) != OK)
+			return ERROR;
+
+		stream_operation.open_stream = open_dbloader_stream;
+		stream_operation.write_to_stream = write_to_dbloader_stream;
+		stream_operation.close_stream = close_dbloader_stream;
+		/* second stage real parse */
+		dbms_long_options = dbc_manager_get_dbcoptions();
+	}
+	else
+	{
+		char *c = getenv(ENV_DBCLIENT_NAME);
+		if (c)
+			dbclient_command = c;
+	}
+
+	optind = 1;
+	opterr = 1;
+	while (1) {
+		int option_index = 0;
+		c = getopt_long(argc, argv, "t:c:d:i:j:n:o:t:w:?", dbms_long_options, &option_index);
+		if (c == -1)
+			break;
 		switch (c) {
 		case 0:
+			if(dbc_manager_set_dbcoption(dbms_long_options[option_index].name, optarg) == ERROR)
+				return 1;
 			break;
 		case 'c':
 			customers = atoi(optarg);
@@ -1013,14 +1102,22 @@ int main(int argc, char *argv[])
 		case 'o':
 			orders = atoi(optarg);
 			break;
+		case 't':
+			break;
 		case 'w':
 			warehouses = atoi(optarg);
 			break;
+		case '?':
+			usage(argv[0]);
+			return 0;
 		default:
-			printf("?? getopt returned character code 0%o ??\n", c);
+			fprintf(stderr, "?? getopt returned character code 0%o ??\n", c);
+			usage(argv[0]);
 			return 2;
 		}
 	}
+
+	set_sqlapi_operation(SQLAPI_SIMPLE);
 
 	if (warehouses == 0) {
 		printf("-w must be used\n");
@@ -1034,13 +1131,6 @@ int main(int argc, char *argv[])
 			(st.st_mode & S_IFMT) != S_IFDIR)) {
 		printf("Output directory of data files '%s' not exists\n", output_path);
 		return 3;
-	}
-
-	if (mode_load == MODE_DIRECT)
-	{
-		char *c = getenv(ENV_SQL_CLIENT_NAME);
-		if (c != NULL)
-			sql_client = c;
 	}
 
 	/* Set the correct delimiter. */
@@ -1062,7 +1152,10 @@ int main(int argc, char *argv[])
 		printf("Output directory of data files: current directory\n");
 	}
 	printf("\n");
-	printf("Generating data files for %d warehouse(s)...\n", warehouses);
+	if(dbms_name[0] != '\0')
+		printf("Loading data to database for %d warehouse(s)...\n", warehouses);
+	else
+		printf("Generating data files for %d warehouse(s)...\n", warehouses);
 
 	tid = (pthread_t *)malloc(sizeof(pthread_t) * jobs);
 	datagen_context = (struct datagen_context_t *)malloc(sizeof(struct datagen_context_t) * jobs);

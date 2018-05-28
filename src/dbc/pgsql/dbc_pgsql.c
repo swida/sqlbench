@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
 #include <libpq-fe.h>
 
 #include "logging.h"
@@ -22,6 +23,14 @@ struct pgsql_context_t
 	struct db_context_t base;
 	PGconn *conn;
 	int inTransaction;
+};
+
+#define LOAD_BUFFER_SIZE 16384
+struct pgsql_loader_stream_t
+{
+	struct loader_stream_t base;
+	char buffer[LOAD_BUFFER_SIZE];
+	int cursor;
 };
 
 static char dbname[16][128] = {""};
@@ -137,7 +146,7 @@ pgsql_rollback_transaction(struct db_context_t *_dbc)
 
 	if (!dbc->inTransaction)
 		return ret;
-	
+
 	res = PQexec(dbc->conn, "ROLLBACK");
 	if (!res || PQresultStatus(res) != PGRES_COMMAND_OK) {
 		LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
@@ -310,6 +319,98 @@ pgsql_sql_getvalue(struct db_context_t *_dbc, struct sql_result_t * sql_result, 
 		LOG_ERROR_MESSAGE("dbt2_sql_getvalue: CALLOC FAILED for value from field=%d\n", field);
 	return tmp;
 }
+
+/* load opreations */
+static struct loader_stream_t *
+pgsql_open_loader_stream(struct db_context_t *_dbc, char *table_name, char delimiter, char *null_str)
+{
+  struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
+  char *buf;
+  PGresult *res;
+  struct pgsql_loader_stream_t *stream = NULL;
+
+  if ((buf = malloc(strlen(table_name) + strlen(null_str) + 64)) == NULL)
+  {
+	  LOG_ERROR_MESSAGE("out of memory\n");
+	  return NULL;
+  }
+
+  sprintf(buf, "COPY %s FROM STDIN DELIMITER '%c' NULL '%s'", table_name, delimiter, null_str);
+
+  res = PQexec(dbc->conn, buf);
+  if (!res || PQresultStatus(res) != PGRES_COPY_IN)
+  {
+	  LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
+	  PQclear(res);
+
+	  return NULL;
+  }
+
+  PQclear(res);
+
+  if ((stream = malloc(sizeof(struct pgsql_loader_stream_t))) == NULL)
+  {
+	  LOG_ERROR_MESSAGE("out of memory\n");
+	  PQputCopyEnd(dbc->conn, "client out of memory");
+	  free(stream);
+	  return NULL;
+  }
+
+  stream->base.dbc = (struct db_context_t *)dbc;
+  stream->cursor = 0;
+
+  return (struct loader_stream_t *)stream;
+}
+
+#define MAX_COPY_DATA_LEN 8192
+static int
+pgsql_write_to_stream(struct loader_stream_t *_stream, const char *fmt, va_list ap)
+{
+	struct pgsql_loader_stream_t *stream = (struct pgsql_loader_stream_t *) _stream;
+	struct pgsql_context_t *dbc = (struct pgsql_context_t*) stream->base.dbc;
+
+	stream->cursor += vsprintf(stream->buffer + stream->cursor, fmt, ap);
+
+	if (stream->cursor > MAX_COPY_DATA_LEN)
+	{
+		if (PQputCopyData(dbc->conn, stream->buffer, stream->cursor) == -1)
+		{
+			LOG_ERROR_MESSAGE("fail to put copy data: %s", PQerrorMessage(dbc->conn));
+			return -1;
+		}
+		stream->cursor = 0;
+	}
+
+	return 0;
+}
+
+static int pgsql_close_loader_stream(struct loader_stream_t *_stream)
+{
+	struct pgsql_loader_stream_t *stream = (struct pgsql_loader_stream_t *) _stream;
+	struct pgsql_context_t *dbc = (struct pgsql_context_t*) stream->base.dbc;
+	int ret = 0;
+
+	if (stream->cursor > 0 && PQputCopyData(dbc->conn, stream->buffer, stream->cursor) == -1)
+	{
+		free(stream);
+		LOG_ERROR_MESSAGE("fail to put copy data: %s", PQerrorMessage(dbc->conn));
+		return -1;
+	}
+
+	if (PQputCopyEnd(dbc->conn, NULL) != -1)
+	{
+		PGresult *res = PQgetResult(dbc->conn);
+		PQclear(res);
+		ret = -1;
+	}
+	else
+		LOG_ERROR_MESSAGE("fail to put copy data: %s", PQerrorMessage(dbc->conn));
+
+	free(stream);
+
+	return ret;
+}
+
 static struct option *
 pgsql_dbc_get_options()
 {
@@ -383,6 +484,13 @@ static struct dbc_sql_operation_t pgsql_sql_operation =
 	pgsql_sql_getvalue
 };
 
+static struct dbc_loader_operation_t pgsql_loader_operation =
+{
+	pgsql_open_loader_stream,
+	pgsql_write_to_stream,
+	pgsql_close_loader_stream
+};
+
 extern struct dbc_storeproc_operation_t pgsql_storeproc_operation;
 
 int
@@ -395,6 +503,7 @@ pgsql_dbc_init()
 
 	pgsql_info->dbc_sql_operation = &pgsql_sql_operation;
 	pgsql_info->dbc_storeproc_operation = &pgsql_storeproc_operation;
+	pgsql_info->dbc_loader_operation = &pgsql_loader_operation;
 	pgsql_info->dbc_get_options = pgsql_dbc_get_options;
 	pgsql_info->dbc_set_option = pgsql_dbc_set_option;
 	dbc_manager_add(pgsql_info);

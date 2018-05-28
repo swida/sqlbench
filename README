@@ -1,1 +1,9 @@
 this a sql bench test tool forked from dbt2 (dbttool.sourceforge.net)
+
+PGPORT=5566 PGHOST=localhost DBT2DBNAME=tpcc src/scripts/pgsql/create-tables
+src/core/datagen -t postgresql --dbname=tpcc --user=dcwang --host=localhost -w 100 -j 10
+PGPORT=5566 PGHOST=localhost DBT2DBNAME=tpcc src/scripts/pgsql/create-indexes
+analyze;
+PGPORT=5566 PGHOST=localhost DBT2DBNAME=tpcc src/scripts/pgsql/plans -o plans.out
+sqlbench/sqlbench -t postgresql --dbname=tpcc --user=yongmei.xym --host=local --port=5566 -w100 -c32 -l7200 -r1200
+sqlbench/src/utils/post_process -l mix.log

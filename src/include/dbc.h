@@ -31,12 +31,25 @@ struct dbc_storeproc_operation_t
 	int (*exec_sp_stock_level) (struct db_context_t *dbc, struct stock_level_t *data);
 };
 
+struct loader_stream_t
+{
+	struct db_context_t *dbc;
+};
+
+struct dbc_loader_operation_t
+{
+	struct loader_stream_t *(*open_loader_stream)(struct db_context_t *dbc, char *table_name, char delimiter, char *null_str);
+	int (*write_to_stream)(struct loader_stream_t *stream, const char *fmt, va_list ap);
+	int (*close_loader_stream)(struct loader_stream_t *stream);
+};
+
 struct dbc_info_t
 {
 	char * dbc_name;
 	char * dbc_usage;
 	struct dbc_sql_operation_t *dbc_sql_operation;
 	struct dbc_storeproc_operation_t *dbc_storeproc_operation;
+	struct dbc_loader_operation_t *dbc_loader_operation;
 	struct option *(*dbc_get_options)();
 	int (*dbc_set_option)(const char *optname, const char *optvalue);
 	/* DBMS special features */
@@ -77,5 +90,10 @@ extern int dbc_sql_execute_prepared(
 extern int dbc_sql_fetchrow(struct db_context_t *dbc, struct sql_result_t * sql_result);
 extern int dbc_sql_close_cursor(struct db_context_t *dbc, struct sql_result_t * sql_result);
 extern char * dbc_sql_getvalue(struct db_context_t *dbc, struct sql_result_t * sql_result, int field);
+
+extern struct loader_stream_t *dbc_open_loader_stream(struct db_context_t *dbc,
+												  char *table_name, char delimiter, char *null_str);
+extern int dbc_write_to_loader_stream(struct loader_stream_t *stream, const char *fmt, va_list ap);
+extern void dbc_close_loader_stream(struct loader_stream_t *stream);
 
 #endif
