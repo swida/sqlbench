@@ -51,7 +51,6 @@ AC_ARG_WITH(mysql,
     [
         case "$withval" in
         ""| y | ye | yes)
-	  mysql=yes
 	  AC_CHECK_PROGS(MYSQL_CONFIG, mysql_config)
 	  if test -z "$MYSQL_CONFIG"
 	  then
@@ -61,10 +60,11 @@ AC_ARG_WITH(mysql,
 	  MYSQL_LIBS=`$MYSQL_CONFIG --libs`
 	  ;;
 	  *)
-	  MYSQL_INCLUDE_DIR="${withval}/include"
+	  MYSQL_INCLUDE_DIR="-I${withval}/include"
 	  MYSQL_LIBS=-L"${withval}/lib -lmysqlclient"
 	  ;;
 	esac
+	mysql=yes
 	AC_SUBST(MYSQL_INCLUDE_DIR)
 	AC_SUBST(MYSQL_LIBS)
     ])

@@ -17,16 +17,24 @@
 #include "common.h"
 #include "db.h"
 
-static char dbname[32] = "dbt2";
+static char dbname[32] = "";
 static char host[32] = "";
 static char port[32] = "54321";
-static char user[32] = "dbt2";
+static char user[32] = "";
 
 struct kingbase_context_t
 {
 	struct db_context_t base;
 	KCIConnection *conn;
 	int inTransaction;
+};
+
+#define LOAD_BUFFER_SIZE 16384
+struct kingbase_loader_stream_t
+{
+	struct loader_stream_t base;
+	char buffer[LOAD_BUFFER_SIZE];
+	int cursor;
 };
 
 static int
@@ -281,6 +289,98 @@ kingbase_sql_getvalue(struct db_context_t *_dbc, struct sql_result_t * sql_resul
 		LOG_ERROR_MESSAGE("dbt2_sql_getvalue: CALLOC FAILED for value from field=%d\n", field);
 	return tmp;
 }
+/* load opreations */
+static struct loader_stream_t *
+kingbase_open_loader_stream(struct db_context_t *_dbc, char *table_name, char delimiter, char *null_str)
+{
+  struct kingbase_context_t *dbc = (struct kingbase_context_t*) _dbc;
+  char *buf;
+  KCIResult *res;
+  struct kingbase_loader_stream_t *stream = NULL;
+
+  if ((buf = malloc(strlen(table_name) + strlen(null_str) + 64)) == NULL)
+  {
+	  LOG_ERROR_MESSAGE("out of memory\n");
+	  return NULL;
+  }
+
+  sprintf(buf, "COPY %s FROM STDIN DELIMITER '%c' NULL '%s'", table_name, delimiter, null_str);
+
+  res = KCIStatementExecute(dbc->conn, buf);
+  free(buf);
+  if (!res || KCIResultGetStatusCode(res) != EXECUTE_COPY_IN)
+  {
+	  LOG_ERROR_MESSAGE("%s", KCIConnectionGetLastError(dbc->conn));
+	  KCIResultDealloc(res);
+
+	  return NULL;
+  }
+
+  PQclear(res);
+
+  if ((stream = malloc(sizeof(struct kingbase_loader_stream_t))) == NULL)
+  {
+	  LOG_ERROR_MESSAGE("out of memory\n");
+	  KCICopySendEOF(dbc->conn, "client out of memory");
+	  free(stream);
+	  return NULL;
+  }
+
+  stream->base.dbc = (struct db_context_t *)dbc;
+  stream->cursor = 0;
+
+  return (struct loader_stream_t *)stream;
+}
+
+#define MAX_COPY_DATA_LEN 8192
+static int
+kingbase_write_to_stream(struct loader_stream_t *_stream, const char *fmt, va_list ap)
+{
+	struct kingbase_loader_stream_t *stream = (struct kingbase_loader_stream_t *) _stream;
+	struct kingbase_context_t *dbc = (struct kingbase_context_t*) stream->base.dbc;
+
+	stream->cursor += vsprintf(stream->buffer + stream->cursor, fmt, ap);
+
+	if (stream->cursor > MAX_COPY_DATA_LEN)
+	{
+		if (KCICopySendData(dbc->conn, stream->buffer, stream->cursor) == -1)
+		{
+			LOG_ERROR_MESSAGE("fail to put copy data: %s", PQerrorMessage(dbc->conn));
+			return -1;
+		}
+		stream->cursor = 0;
+	}
+
+	return 0;
+}
+
+static int kingbase_close_loader_stream(struct loader_stream_t *_stream)
+{
+	struct kingbase_loader_stream_t *stream = (struct kingbase_loader_stream_t *) _stream;
+	struct kingbase_context_t *dbc = (struct kingbase_context_t*) stream->base.dbc;
+	int ret = 0;
+
+	if (stream->cursor > 0 && KCICopySendData(dbc->conn, stream->buffer, stream->cursor) == -1)
+	{
+		free(stream);
+		LOG_ERROR_MESSAGE("fail to put copy data: %s", KCIConnectionGetLastError(dbc->conn));
+		return -1;
+	}
+
+	if (KCICopySendEOF(dbc->conn, NULL) != -1)
+	{
+		KCIResult *res = KCIConnectionFetchResult(dbc->conn);
+		KCIResultDealloc(res);
+		ret = -1;
+	}
+	else
+		LOG_ERROR_MESSAGE("fail to put copy data: %s", KCIConnectionGetLastError(dbc->conn));
+
+	free(stream);
+
+	return ret;
+}
+
 static struct option *
 kingbase_dbc_get_options()
 {
@@ -353,6 +453,13 @@ struct dbc_sql_operation_t kingbase_sql_operation =
 	kingbase_sql_getvalue
 };
 
+static struct dbc_loader_operation_t kingbase_loader_operation =
+{
+	kingbase_open_loader_stream,
+	kingbase_write_to_stream,
+	kingbase_close_loader_stream
+};
+
 extern struct dbc_storeproc_operation_t kingbase_storeproc_operation;
 
 int
@@ -365,6 +472,7 @@ kingbase_dbc_init()
 
 	kingbase_info->dbc_sql_operation = &kingbase_sql_operation;
 	kingbase_info->dbc_storeproc_operation = NULL;
+	kingbase_info->dbc_loader_operation = &kingbase_loader_operation;
 	kingbase_info->dbc_get_options = kingbase_dbc_get_options;
 	kingbase_info->dbc_set_option = kingbase_dbc_set_option;
 	dbc_manager_add(kingbase_info);

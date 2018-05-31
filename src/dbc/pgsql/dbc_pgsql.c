@@ -338,6 +338,7 @@ pgsql_open_loader_stream(struct db_context_t *_dbc, char *table_name, char delim
   sprintf(buf, "COPY %s FROM STDIN DELIMITER '%c' NULL '%s'", table_name, delimiter, null_str);
 
   res = PQexec(dbc->conn, buf);
+  free(buf);
   if (!res || PQresultStatus(res) != PGRES_COPY_IN)
   {
 	  LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));

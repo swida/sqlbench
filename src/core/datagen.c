@@ -1024,14 +1024,14 @@ int main(int argc, char *argv[])
 	int j;
 	int chunk, rem, curr_end;
 
+	init_common();
+	init_logging();
+	init_dbc_manager();
+
 	if (argc < 2) {
 		usage(argv[0]);
 		return 1;
 	}
-
-	init_common();
-	init_logging();
-	init_dbc_manager();
 
 	/* first stage choose dbms */
 	opterr = 0;
