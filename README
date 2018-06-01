@@ -1,9 +1,36 @@
-this a sql bench test tool forked from dbt2 (dbttool.sourceforge.net)
+create tables
+-------------
+PostgreSQL:
+mysql -f src/scripts/create-tables.sql
+MySQL:
+mysql < src/scripts/create-tables.sql
 
-PGPORT=5566 PGHOST=localhost DBT2DBNAME=tpcc src/scripts/pgsql/create-tables
+load data
+----------
+PostgreSQL:
 src/core/datagen -t postgresql --dbname=tpcc --user=dcwang --host=localhost -w 100 -j 10
-PGPORT=5566 PGHOST=localhost DBT2DBNAME=tpcc src/scripts/pgsql/create-indexes
+MySQL:
+src/core/datagen -t mysql --dbname=tpcc --user=dcwang --host=127.0.0.1 -w 100 -j 10
+
+create indexes
+--------------
+Execute Use src/scripts/create-indexes.sql using SQL shell, eg.
+psql -f src/scripts/create-indexes.sql
 analyze;
+
+check plans
+-----------
+PostgreSQL:
 PGPORT=5566 PGHOST=localhost DBT2DBNAME=tpcc src/scripts/pgsql/plans -o plans.out
-sqlbench/sqlbench -t postgresql --dbname=tpcc --user=yongmei.xym --host=local --port=5566 -w100 -c32 -l7200 -r1200
+
+run test
+--------
+PostgreSQL:
+sqlbench/sqlbench -t postgresql --dbname=tpcc --user=tpcc --host=localhost --port=5566 -w100 -c32 -l7200 -r1200
+MySQL:
+sqlbench/sqlbench -t mysql --dbname=tpcc --user=tpcc --host=127.0.0.1 --port=3306 -w100 -c32 -l7200 -r1200
+
+
+test result
+-----------
 sqlbench/src/utils/post_process -l mix.log

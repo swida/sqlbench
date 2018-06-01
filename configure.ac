@@ -146,6 +146,7 @@ if test "$mysql" = yes
 then
 	AC_CONFIG_FILES([
 		src/dbc/mysql/Makefile
+		src/storeproc/mysql/Makefile
 	])
 fi
 
