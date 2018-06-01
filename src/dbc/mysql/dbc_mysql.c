@@ -448,5 +448,8 @@ mysql_dbc_init()
 	mysql_info->dbc_get_options = mysql_dbc_get_options;
 	mysql_info->dbc_set_option = mysql_dbc_set_option;
 	dbc_manager_add(mysql_info);
+
+	mysql_library_init(0, NULL, NULL);
+
 	return OK;
 }

@@ -1,2 +1,3 @@
 - remove client, only support standalone mode.
 - implement threadpool
+- should call mysql_library_end().
