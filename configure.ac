@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([sqlbench], [0.6.0], [dianchengwang@gmail.com])
+AC_INIT([sqlbench], [0.6.1], [dianchengwang@gmail.com])
 AM_INIT_AUTOMAKE([silent-rules])
 AC_CONFIG_SRCDIR([src/core/driver.c])
 AC_CONFIG_HEADERS([config.h])
