@@ -34,9 +34,9 @@ mysql_commit_transaction(struct db_context_t *_dbc)
 	if(!dbc->inTransaction)
 		return OK;
 
-	if (mysql_real_query(dbc->mysql, "COMMIT", 6)) 
+	if (mysql_real_query(dbc->mysql, "COMMIT", 6))
 	{
-        LOG_ERROR_MESSAGE("COMMIT failed. mysql reports: %d %s", 
+        LOG_ERROR_MESSAGE("COMMIT failed. mysql reports: %d %s",
 						  mysql_errno(dbc->mysql), mysql_error(dbc->mysql));
         return ERROR;
 	}
@@ -54,9 +54,9 @@ mysql_rollback_transaction(struct db_context_t *_dbc)
 	if (!dbc->inTransaction)
 		return STATUS_ROLLBACK;
 
-	if (mysql_real_query(dbc->mysql, "ROLLBACK", 8)) 
+	if (mysql_real_query(dbc->mysql, "ROLLBACK", 8))
 	{
-        LOG_ERROR_MESSAGE("ROLLBACK failed. mysql reports: %d %s", 
+        LOG_ERROR_MESSAGE("ROLLBACK failed. mysql reports: %d %s",
 						  mysql_errno(dbc->mysql), mysql_error(dbc->mysql));
         return ERROR;
 	}
@@ -87,8 +87,8 @@ mysql_connect_to_db(struct db_context_t *_dbc)
 		if (mysql_errno(dbc->mysql))
 		{
 			LOG_ERROR_MESSAGE("Connection to database '%s' failed.", my_dbname);
-			LOG_ERROR_MESSAGE("mysql reports: %d %s", 
-							mysql_errno(dbc->mysql), mysql_error(dbc->mysql));
+			LOG_ERROR_MESSAGE("mysql reports: %d %s",
+							  mysql_errno(dbc->mysql), mysql_error(dbc->mysql));
 		}
 		dbc->base.need_reconnect = 1;
 		return ERROR;
@@ -97,12 +97,19 @@ mysql_connect_to_db(struct db_context_t *_dbc)
     /* Disable AUTOCOMMIT mode for connection */
     if (mysql_real_query(dbc->mysql, "SET AUTOCOMMIT=0", 16))
     {
-      LOG_ERROR_MESSAGE("mysql reports: %d %s", mysql_errno(dbc->mysql) ,
-                         mysql_error(dbc->mysql));
-      return ERROR;
+		LOG_ERROR_MESSAGE("mysql reports: %d %s", mysql_errno(dbc->mysql) ,
+						  mysql_error(dbc->mysql));
+		return ERROR;
     }
 
-	dbc->base.need_reconnect = 0;
+    if (mysql_real_query(dbc->mysql, "SET SESSION SQL_MODE=concat('NO_BACKSLASH_ESCAPES,', @@sql_mode)", 64))
+    {
+		LOG_ERROR_MESSAGE("could disable backslash escapes in mysql session: %d %s", mysql_errno(dbc->mysql) ,
+						  mysql_error(dbc->mysql));
+		return ERROR;
+    }
+
+    dbc->base.need_reconnect = 0;
 
     return OK;
 }
@@ -120,8 +127,8 @@ mysql_disconnect_from_db(struct db_context_t *_dbc)
 
 static int
 mysql_sql_execute(struct db_context_t *_dbc, char *query,
-					  struct sql_result_t *sql_result, 
-					  char *query_name)
+				  struct sql_result_t *sql_result,
+				  char *query_name)
 {
 
 	struct mysql_context_t *dbc = (struct mysql_context_t*) _dbc;
@@ -129,9 +136,9 @@ mysql_sql_execute(struct db_context_t *_dbc, char *query,
 	if (!dbc->inTransaction)
 	{
 		/* Start a transaction block. */
-		if (mysql_real_query(dbc->mysql, "COMMIT", 6)) 
+		if (mysql_real_query(dbc->mysql, "COMMIT", 6))
 		{
-			LOG_ERROR_MESSAGE("COMMIT failed. mysql reports: %d %s", 
+			LOG_ERROR_MESSAGE("COMMIT failed. mysql reports: %d %s",
 							  mysql_errno(dbc->mysql), mysql_error(dbc->mysql));
 			return ERROR;
 		}
@@ -151,11 +158,11 @@ mysql_sql_execute(struct db_context_t *_dbc, char *query,
 
 		if (sql_result->result_set)
 			sql_result->num_rows= mysql_num_rows(sql_result->result_set);
-		else  
+		else
 		{
 			if (mysql_field_count(dbc->mysql) == 0)
 				sql_result->num_rows = mysql_affected_rows(dbc->mysql);
-			else 
+			else
 			{
 				LOG_ERROR_MESSAGE("%s: %s\nmysql reports: %d %s",query_name, query,
 								  mysql_errno(dbc->mysql), mysql_error(dbc->mysql));
@@ -171,7 +178,7 @@ static int
 mysql_sql_fetchrow(struct db_context_t *_dbc, struct sql_result_t * sql_result)
 {
 	(void) _dbc;
-	
+
 	if ((sql_result->current_row = mysql_fetch_row(sql_result->result_set)) == NULL)
 		return 0;
 #if 0
@@ -237,9 +244,9 @@ mysql_open_loader_stream(struct db_context_t *_dbc, char *table_name, char delim
 	/* ENABLE AUTOCOMMIT mode for connection when loading data */
     if (mysql_real_query(dbc->mysql, "SET AUTOCOMMIT=1", 16))
     {
-      LOG_ERROR_MESSAGE("count not set autocommit, mysql reports: (%d) %s", mysql_errno(dbc->mysql) ,
-                         mysql_error(dbc->mysql));
-      return NULL;
+		LOG_ERROR_MESSAGE("count not set autocommit, mysql reports: (%d) %s", mysql_errno(dbc->mysql) ,
+						  mysql_error(dbc->mysql));
+		return NULL;
     }
 
 	if ((buf = malloc(strlen(table_name) * 2 + strlen(null_str) + 128)) == NULL)
@@ -251,41 +258,41 @@ mysql_open_loader_stream(struct db_context_t *_dbc, char *table_name, char delim
 	sprintf(buf, "load data local infile '%s' into table %s fields terminated by '%c'", table_name, table_name, delimiter);
 
 	if (mysql_send_query(dbc->mysql, buf, strlen(buf)))
-  {
-	  free(buf);
-	  LOG_ERROR_MESSAGE("could not execute load data local infile statement: %s",
-						 mysql_error(dbc->mysql));
-	  return NULL;
-  }
-  free(buf);
+	{
+		free(buf);
+		LOG_ERROR_MESSAGE("could not execute load data local infile statement: %s",
+						  mysql_error(dbc->mysql));
+		return NULL;
+	}
+	free(buf);
 
-  if (cli_safe_read(dbc->mysql) == packet_error)
-  {
-	  LOG_ERROR_MESSAGE("fail to read data from mysql server: %s",
-						mysql_error(dbc->mysql));
-	  return NULL;
-  }
+	if (cli_safe_read(dbc->mysql) == packet_error)
+	{
+		LOG_ERROR_MESSAGE("fail to read data from mysql server: %s",
+						  mysql_error(dbc->mysql));
+		return NULL;
+	}
 
-  pos=(unsigned char*) dbc->mysql->net.read_pos;
-  if (net_field_length(&pos) != NULL_LENGTH)
-  {
-	  LOG_ERROR_MESSAGE("unexpected packet from mysql server");
-	  return NULL;
-  }
+	pos=(unsigned char*) dbc->mysql->net.read_pos;
+	if (net_field_length(&pos) != NULL_LENGTH)
+	{
+		LOG_ERROR_MESSAGE("unexpected packet from mysql server");
+		return NULL;
+	}
 
-  if ((stream = malloc(sizeof(struct mysql_loader_stream_t))) == NULL)
-  {
-	  LOG_ERROR_MESSAGE("out of memory\n");
-	  (void) my_net_write(net,(const unsigned char*) "",0); /* Server needs one packet */
-	  net_flush(net);
+	if ((stream = malloc(sizeof(struct mysql_loader_stream_t))) == NULL)
+	{
+		LOG_ERROR_MESSAGE("out of memory\n");
+		(void) my_net_write(net,(const unsigned char*) "",0); /* Server needs one packet */
+		net_flush(net);
 
-	  return NULL;
-  }
+		return NULL;
+	}
 
-  stream->base.dbc = (struct db_context_t *)dbc;
-  stream->cursor = 0;
+	stream->base.dbc = (struct db_context_t *)dbc;
+	stream->cursor = 0;
 
-  return (struct loader_stream_t *)stream;
+	return (struct loader_stream_t *)stream;
 
 }
 
@@ -301,13 +308,13 @@ mysql_write_to_stream(struct loader_stream_t *_stream, const char *fmt, va_list 
 
 	if (stream->cursor > MAX_PACK_DATA_LEN)
 	{
-		 if (my_net_write(net, stream->buffer, stream->cursor))
-		 {
-			 LOG_ERROR_MESSAGE("fail to send data to mysql server, server lost.");
-			 return -1;
-		 }
+		if (my_net_write(net, stream->buffer, stream->cursor))
+		{
+			LOG_ERROR_MESSAGE("fail to send data to mysql server, server lost.");
+			return -1;
+		}
 
-		 stream->cursor = 0;
+		stream->cursor = 0;
 	}
 
 	return 0;
@@ -388,7 +395,7 @@ static int
 mysql_dbc_set_option(const char *optname, const char *optvalue)
 {
 	if(strcmp(optname, "dbname") == 0 && optvalue != NULL)
-	   strncpy(my_dbname, optvalue, sizeof(my_dbname));
+		strncpy(my_dbname, optvalue, sizeof(my_dbname));
 	else if(strcmp(optname, "host") == 0 && optvalue != NULL)
 		strncpy(my_host, optvalue, sizeof(my_host));
 	else if(strcmp(optname, "port") == 0 && optvalue != NULL)
