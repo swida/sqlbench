@@ -8,22 +8,43 @@
  * 11 June 2002
  */
 
-#include <pthread.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
+#include <sql.h>
+#include <sqlext.h>
+#include <pthread.h>
 
-#include <odbc_common.h>
+#include "logging.h"
+#include "transaction_data.h"
+#include "dbc.h"
+#include "common.h"
+#include "db.h"
 
-SQLHENV henv = SQL_NULL_HENV;
-pthread_mutex_t db_source_mutex = PTHREAD_MUTEX_INITIALIZER;
+static SQLHENV henv = SQL_NULL_HENV;
+static pthread_mutex_t db_source_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-SQLCHAR servername[32];
-SQLCHAR username[32];
-SQLCHAR authentication[32];
-
-int check_odbc_rc(SQLSMALLINT handle_type, SQLHANDLE handle, SQLRETURN rc)
+struct odbc_context_t
 {
-	
+	struct db_context_t base;
+	SQLHDBC hdbc;
+	SQLHSTMT hstmt;
+};
+
+struct odbc_result_set
+{
+	SQLSMALLINT num_fields;
+	SQLULEN *lengths;
+};
+
+static SQLCHAR servername[32];
+static SQLCHAR username[32];
+static SQLCHAR authentication[32];
+
+static int
+check_odbc_rc(SQLSMALLINT handle_type, SQLHANDLE handle, SQLRETURN rc)
+{
+
 	if (rc == SQL_SUCCESS) {
 		return OK;
 	} else if (rc == SQL_SUCCESS_WITH_INFO) {
@@ -39,12 +60,13 @@ int check_odbc_rc(SQLSMALLINT handle_type, SQLHANDLE handle, SQLRETURN rc)
 	} else if (rc == SQL_INVALID_HANDLE) {
 		LOG_ERROR_MESSAGE("SQL_INVALID_HANDLE");
 	}
-	
+
 	return OK;
 }
 
 /* Print out all errors messages generated to the error log file. */
-int log_odbc_error(char *filename, int line, SQLSMALLINT handle_type,
+static int
+log_odbc_error(char *filename, int line, SQLSMALLINT handle_type,
 		SQLHANDLE handle)
 {
 	SQLCHAR sqlstate[5];
@@ -62,22 +84,28 @@ int log_odbc_error(char *filename, int line, SQLSMALLINT handle_type,
 	return OK;
 }
 
-int commit_transaction(struct db_context_t *dbc)
+#define LOG_ODBC_ERROR(type, handle) log_odbc_error(__FILE__, __LINE__, type, handle)
+
+static int
+odbc_commit_transaction(struct db_context_t *_dbc)
 {
 	int i;
+	struct odbc_context_t *dbc = (struct odbc_context_t*) _dbc;
 
 	i = SQLEndTran(SQL_HANDLE_DBC, dbc->hdbc, SQL_COMMIT);
 	if (i != SQL_SUCCESS && i != SQL_SUCCESS_WITH_INFO) {
 		LOG_ODBC_ERROR(SQL_HANDLE_STMT, dbc->hstmt);
 		return ERROR;
 	}
+
 	return OK;
 }
 
 /* Open an ODBC connection to the database. */
-int _connect_to_db(struct db_context_t *odbcc)
+static int odbc_connect_to_db(struct db_context_t *dbc)
 {
 	SQLRETURN rc;
+	struct odbc_context_t *odbcc = (struct odbc_context_t*) dbc;
 
 	/* Allocate connection handles. */
 	pthread_mutex_lock(&db_source_mutex);
@@ -117,6 +145,7 @@ int _connect_to_db(struct db_context_t *odbcc)
 		LOG_ODBC_ERROR(SQL_HANDLE_STMT, odbcc->hstmt);
 		return ERROR;
 	}
+
 	pthread_mutex_unlock(&db_source_mutex);
 
 	return OK;
@@ -127,9 +156,11 @@ int _connect_to_db(struct db_context_t *odbcc)
  * Note that we create the environment handle in odbc_connect() but
  * we don't touch it here.
  */
-int odbc_disconnect(struct db_context_t *odbcc)
+static int
+odbc_disconnect_from_db(struct db_context_t *dbc)
 {
 	SQLRETURN rc;
+	struct odbc_context_t *odbcc = (struct odbc_context_t*) dbc;
 
 	pthread_mutex_lock(&db_source_mutex);
 	rc = SQLDisconnect(odbcc->hdbc);
@@ -152,153 +183,245 @@ int odbc_disconnect(struct db_context_t *odbcc)
 }
 
 /* Initialize ODBC environment handle and the database connect string. */
-int _db_init(char *sname, char *uname, char *auth)
+static struct db_context_t *
+odbc_db_init()
 {
+	struct db_context_t *context;
 	SQLRETURN rc;
 
 	/* Initialized the environment handle. */
 	rc = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &henv);
 	if (rc != SQL_SUCCESS && rc != SQL_SUCCESS_WITH_INFO) {
 		LOG_ERROR_MESSAGE("alloc env handle failed");
-		return ERROR;
+		return NULL;
 	}
 	rc = SQLSetEnvAttr(henv, SQL_ATTR_ODBC_VERSION, (void *) SQL_OV_ODBC3, 0);
 	if (rc != SQL_SUCCESS && rc != SQL_SUCCESS_WITH_INFO) {
 		SQLFreeHandle(SQL_HANDLE_ENV, henv);
-		return ERROR;
+		return NULL;
 	}
 
-	/* Set the database connect string, username and password. */
-	strcpy(servername, sname);
-	strcpy(username, uname);
-	strcpy(authentication, auth);
-	return OK;
+	context = malloc(sizeof(struct odbc_context_t));
+	memset(context, 0, sizeof(struct odbc_context_t));
+	return context;
 }
 
-int rollback_transaction(struct db_context_t *dbc)
+static int
+odbc_rollback_transaction(struct db_context_t *_dbc)
 {
 	int i;
+	struct odbc_context_t *dbc = (struct odbc_context_t*) _dbc;
 
 	i = SQLEndTran(SQL_HANDLE_DBC, dbc->hdbc, SQL_ROLLBACK);
 	if (i != SQL_SUCCESS && i != SQL_SUCCESS_WITH_INFO) {
 		LOG_ODBC_ERROR(SQL_HANDLE_STMT, dbc->hstmt);
 		return ERROR;
 	}
+
 	return STATUS_ROLLBACK;
 }
 
-
-int dbt2_sql_execute(struct db_context_t *dbc, char * query, 
-		struct sql_result_t * sql_result, char * query_name)
+static int
+odbc_sql_execute(struct db_context_t *_dbc, char *query,
+		struct sql_result_t *sql_result, char *query_name)
 {
 	int i;
 	SQLCHAR colname[32];
 	SQLSMALLINT coltype;
 	SQLSMALLINT colnamelen;
 	SQLSMALLINT scale;
+	SQLLEN num_rows;
 	SQLRETURN rc;
-  
-	sql_result->num_fields= 0;
-	sql_result->num_rows= 0;
-	sql_result->query= query;
+	struct odbc_context_t *dbc = (struct odbc_context_t*) _dbc;
+	struct odbc_result_set *odbc_rs;
+
+	if (sql_result)
+	{
+		odbc_rs = malloc(sizeof(struct odbc_result_set));
+		odbc_rs->num_fields= 0;
+		odbc_rs->lengths = NULL;
+		sql_result->result_set = odbc_rs;
+		sql_result->num_rows= 0;
+	}
 
 	rc = SQLExecDirect(dbc->hstmt, query, SQL_NTS);
 	if (rc != SQL_SUCCESS && rc != SQL_SUCCESS_WITH_INFO) {
 		LOG_ODBC_ERROR(SQL_HANDLE_STMT, dbc->hstmt);
 		return 0;
 	}
-	rc = SQLNumResultCols(dbc->hstmt,&sql_result->num_fields);
+
+	if (!sql_result)
+		return OK;
+
+	rc = SQLNumResultCols(dbc->hstmt, &odbc_rs->num_fields);
 	if (rc != SQL_SUCCESS && rc != SQL_SUCCESS_WITH_INFO) {
 		LOG_ODBC_ERROR(SQL_HANDLE_STMT, dbc->hstmt);
 		return 0;
 	}
 
-	rc = SQLRowCount(dbc->hstmt, &sql_result->num_rows);
+	rc = SQLRowCount(dbc->hstmt, &num_rows);
 	if (rc != SQL_SUCCESS && rc != SQL_SUCCESS_WITH_INFO)  {
 		LOG_ODBC_ERROR(SQL_HANDLE_STMT, dbc->hstmt);
 		return 0;
 	}
+	sql_result->num_rows = (int) num_rows;
 
-	if (sql_result->num_fields) {
-		sql_result->lengths= malloc(sizeof(int) * sql_result->num_fields);
+	if (odbc_rs->num_fields) {
+		odbc_rs->lengths= malloc(sizeof(SQLULEN) * odbc_rs->num_fields);
 
-		for (i=0; i < sql_result->num_fields; i++) {
-			SQLDescribeCol(dbc->hstmt, 
+		for (i=0; i < odbc_rs->num_fields; i++) {
+			SQLDescribeCol(dbc->hstmt,
 					(SQLSMALLINT)(i + 1),
 					colname,
 					sizeof(colname),
 					&colnamelen,
 					&coltype,
-					&sql_result->lengths[i],
+					&odbc_rs->lengths[i],
 					&scale,
 					NULL
 			);
-    	} 
-		sql_result->current_row = 1;
-		sql_result->result_set = 1;
+		}
+		sql_result->current_row_num = 1;
 	}
 
-	return 1;
+	return OK;
 }
 
-int dbt2_sql_close_cursor(struct db_context_t *dbc,
+static int
+odbc_sql_close_cursor(struct db_context_t *_dbc,
 		struct sql_result_t * sql_result)
 {
 	SQLRETURN   rc;
-   
-	if (sql_result->lengths) {
-		free(sql_result->lengths);
-		sql_result->lengths=NULL;
+	struct odbc_result_set *odbc_rs = sql_result->result_set;
+	struct odbc_context_t *dbc = (struct odbc_context_t*) _dbc;
+
+	if (odbc_rs->lengths) {
+		free(odbc_rs->lengths);
+		odbc_rs->lengths = NULL;
 	}
- 
+	free(odbc_rs);
+
 	rc = SQLCloseCursor(dbc->hstmt);
 	if (rc != SQL_SUCCESS && rc != SQL_SUCCESS_WITH_INFO) {
 		LOG_ODBC_ERROR(SQL_HANDLE_STMT, dbc->hstmt);
 		return 0;
 	}
-	return 1;  
+	return OK;
 }
 
-int dbt2_sql_fetchrow(struct db_context_t *dbc,
+
+static int
+odbc_sql_fetchrow(struct db_context_t *_dbc,
 		struct sql_result_t * sql_result)
 {
 	SQLRETURN  rc;
-   
+	struct odbc_context_t *dbc = (struct odbc_context_t*) _dbc;
+
 	rc = SQLFetch(dbc->hstmt);
 
 	if (rc != SQL_SUCCESS && rc != SQL_SUCCESS_WITH_INFO) {
 		LOG_ODBC_ERROR(SQL_HANDLE_STMT, dbc->hstmt);
 		/* result set - NULL */
-		sql_result->current_row= 0;
+		sql_result->current_row_num= 0;
 		return 0;
 	}
-  
+
   return 1;
 }
 
-char *dbt2_sql_getvalue(struct db_context_t *dbc,
-		struct sql_result_t *sql_result, int field)
+static char *
+odbc_sql_getvalue(struct db_context_t *_dbc,
+				  struct sql_result_t *sql_result, int field)
 {
 	SQLRETURN rc;
-	char *tmp;
-  
-	tmp = NULL;
-	SQLINTEGER cb_var = 0;
+	char *tmp = NULL;
+	SQLLEN cb_var = 0;
+	struct odbc_context_t *dbc = (struct odbc_context_t*) _dbc;
+	struct odbc_result_set *odbc_rs = sql_result->result_set;
 
-	if (sql_result->current_row && field < sql_result->num_fields) {
-		if ((tmp = calloc(sizeof(char), sql_result->lengths[field] + 1))) {
+	if (sql_result->current_row_num && field < odbc_rs->num_fields) {
+		if ((tmp = calloc(sizeof(char), odbc_rs->lengths[field] + 1))) {
 			rc = SQLGetData(dbc->hstmt, field + 1, SQL_C_CHAR, tmp,
-					sql_result->lengths[field] + 1, &cb_var);
+					odbc_rs->lengths[field] + 1, &cb_var);
 			if (rc != SQL_SUCCESS && rc != SQL_SUCCESS_WITH_INFO) {
 				LOG_ODBC_ERROR(SQL_HANDLE_STMT, dbc->hstmt);
 			}
 		} else {
 			LOG_ERROR_MESSAGE("dbt2_sql_getvalue: CALLOC FAILED for value from field=%d\n", field);
 		}
-#ifdef DEBUG_QUERY
-	} else {
-		LOG_ERROR_MESSAGE("dbt2_sql_getvalue: FIELD %d current_row %d\nQUERY --- %s\n", field, sql_result->current_row, sql_result->query);
-#endif
 	}
+
 	return tmp;
+}
+
+static struct option *
+odbc_dbc_get_options()
+{
+#define N_PGSQL_OPT  3
+	struct option *dbc_options = malloc(sizeof(struct option) * (N_PGSQL_OPT + 1));
+
+	dbc_options[0].name = "servername";
+	dbc_options[0].has_arg = required_argument;
+	dbc_options[0].flag = NULL;
+	dbc_options[0].val = 0;
+
+	dbc_options[1].name = "username";
+	dbc_options[1].has_arg = required_argument;
+	dbc_options[1].flag = NULL;
+	dbc_options[1].val = 0;
+
+	dbc_options[2].name = "authentication";
+	dbc_options[2].has_arg = required_argument;
+	dbc_options[2].flag = NULL;
+	dbc_options[2].val = 0;
+
+	dbc_options[N_PGSQL_OPT].name = 0;
+	dbc_options[N_PGSQL_OPT].has_arg = 0;
+	dbc_options[N_PGSQL_OPT].flag = 0;
+	dbc_options[N_PGSQL_OPT].val = 0;
+	return dbc_options;
+}
+
+static int
+odbc_dbc_set_option(const char *optname, const char *optvalue)
+{
+	if(strcmp(optname, "servername") == 0 && optvalue != NULL)
+		strncpy(servername, optvalue, sizeof(servername));
+	else if(strcmp(optname, "username") == 0 && optvalue != NULL)
+		strncpy(username, optvalue, sizeof(username));
+	else if(strcmp(optname, "authentication") == 0 && optvalue != NULL)
+		strncpy(authentication, optvalue, sizeof(authentication));
+
+	return OK;
+}
+
+static struct dbc_sql_operation_t odbc_sql_operation =
+{
+	odbc_db_init,
+	odbc_connect_to_db,
+	odbc_disconnect_from_db,
+	odbc_commit_transaction,
+	odbc_rollback_transaction,
+	odbc_sql_execute,
+	NULL,
+	NULL,
+	odbc_sql_fetchrow,
+	odbc_sql_close_cursor,
+	odbc_sql_getvalue
+};
+
+int
+odbc_dbc_init()
+{
+	struct dbc_info_t *odbc_info = make_dbc_info(
+		"odbc",
+		"for odbc: --servername=<servername> --username=<username> --authentication=<auth>");
+	odbc_info->is_forupdate_supported = 0;
+	odbc_info->dbc_sql_operation = &odbc_sql_operation;
+	odbc_info->dbc_storeproc_operation = NULL;
+	odbc_info->dbc_loader_operation = NULL,
+	odbc_info->dbc_get_options = odbc_dbc_get_options;
+	odbc_info->dbc_set_option = odbc_dbc_set_option;
+	dbc_manager_add(odbc_info);
+	return OK;
 }

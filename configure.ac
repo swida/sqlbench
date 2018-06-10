@@ -98,9 +98,37 @@ then
 	AC_DEFINE(ENABLE_KINGBASE, 1, [enable kingbase support.])
 fi
 
-if test "$postgresql" != yes -a "$kingbase" != yes -a "$mysql" != yes
+odbc=no
+AC_ARG_WITH(odbc,
+    [  --with-odbc=yes     enable UnixODBC support],
+    [
+        case "$withval" in
+	"" | y | ye | yes)
+	    AC_CHECK_HEADERS(sql.h,
+	        [AC_EGREP_HEADER([SQLExecDirect], sql.h, [],
+		[AC_MSG_ERROR([header file <sql.h> does not match UnixODBC library])])],
+		[AC_MSG_ERROR([header file <sql.h> is required for UnixODBC])])
+          ;;
+	n | no)
+	  ;;
+	*)
+		AC_MSG_ERROR([*** you can supply yes or no to the --with-odbc option.])
+	;;
+        esac
+	odbc=yes
+	ODBC_LIBS=-lodbc
+	AC_SUBST(ODBC_LIBS)
+    ])
+
+AM_CONDITIONAL([ENABLE_ODBC], [test "$odbc" = yes])
+if test "$odbc" = yes
 then
-	AC_MSG_ERROR([*** you must select database using --with-DATABASE options, current supported DATABASE: postgresql, mysql or kingbase. ])
+	AC_DEFINE(ENABLE_ODBC, 1, [enable odbc support.])
+fi
+
+if test "$postgresql" != yes -a "$kingbase" != yes -a "$mysql" != yes -a "$odbc" != yes
+then
+	AC_MSG_ERROR([*** you must select database client interface using --with-PACKAGE options, current supported: postgresql, mysql, kingbase and odbc. ])
 fi
 # Checks for libraries.
 AC_CHECK_LIB([m], [pow])
@@ -156,6 +184,13 @@ then
 		src/dbc/kingbase/Makefile
 		src/storeproc/kingbase/Makefile
 		src/storeproc/kingbase/plsql/Makefile
+	])
+fi
+
+if test "$odbc" = yes
+then
+	AC_CONFIG_FILES([
+		src/dbc/odbc/Makefile
 	])
 fi
 

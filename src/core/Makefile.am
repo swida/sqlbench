@@ -20,6 +20,10 @@ if ENABLE_MYSQL
 LDADD += ../dbc/mysql/libdbc_mysql.a $(MYSQL_LIBS)
 endif
 
+if ENABLE_ODBC
+LDADD += ../dbc/odbc/libdbc_odbc.a $(ODBC_LIBS)
+endif
+
 datagen_SOURCES = datagen.c
 sqlbench_SOURCES = driver_main.c driver.c transaction_queue.c db_threadpool.c terminal_queue.c
 transaction_test_SOURCES = transaction_test.c

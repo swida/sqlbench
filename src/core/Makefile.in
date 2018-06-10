@@ -92,6 +92,7 @@ bin_PROGRAMS = datagen$(EXEEXT) sqlbench$(EXEEXT) \
 @ENABLE_POSTGRESQL_TRUE@am__append_1 = ../dbc/pgsql/libdbc_pgsql.a ../storeproc/pgsql/libsppgsql.a -L$(PGSQL_LIB_DIR) -lpq
 @ENABLE_KINGBASE_TRUE@am__append_2 = ../dbc/kingbase/libdbc_kingbase.a $(KINGBASE_LIBS)
 @ENABLE_MYSQL_TRUE@am__append_3 = ../dbc/mysql/libdbc_mysql.a $(MYSQL_LIBS)
+@ENABLE_ODBC_TRUE@am__append_4 = ../dbc/odbc/libdbc_odbc.a $(ODBC_LIBS)
 subdir = src/core
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -130,9 +131,12 @@ am__DEPENDENCIES_2 =
 @ENABLE_KINGBASE_TRUE@	$(am__DEPENDENCIES_2)
 @ENABLE_MYSQL_TRUE@am__DEPENDENCIES_4 = ../dbc/mysql/libdbc_mysql.a \
 @ENABLE_MYSQL_TRUE@	$(am__DEPENDENCIES_2)
+@ENABLE_ODBC_TRUE@am__DEPENDENCIES_5 = ../dbc/odbc/libdbc_odbc.a \
+@ENABLE_ODBC_TRUE@	$(am__DEPENDENCIES_2)
 datagen_DEPENDENCIES = libcore.a ../simple/libsimplesql.a \
 	../extended/libextended.a $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_3) $(am__DEPENDENCIES_4)
+	$(am__DEPENDENCIES_3) $(am__DEPENDENCIES_4) \
+	$(am__DEPENDENCIES_5)
 am_sqlbench_OBJECTS = driver_main.$(OBJEXT) driver.$(OBJEXT) \
 	transaction_queue.$(OBJEXT) db_threadpool.$(OBJEXT) \
 	terminal_queue.$(OBJEXT)
@@ -140,13 +144,15 @@ sqlbench_OBJECTS = $(am_sqlbench_OBJECTS)
 sqlbench_LDADD = $(LDADD)
 sqlbench_DEPENDENCIES = libcore.a ../simple/libsimplesql.a \
 	../extended/libextended.a $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_3) $(am__DEPENDENCIES_4)
+	$(am__DEPENDENCIES_3) $(am__DEPENDENCIES_4) \
+	$(am__DEPENDENCIES_5)
 am_transaction_test_OBJECTS = transaction_test.$(OBJEXT)
 transaction_test_OBJECTS = $(am_transaction_test_OBJECTS)
 transaction_test_LDADD = $(LDADD)
 transaction_test_DEPENDENCIES = libcore.a ../simple/libsimplesql.a \
 	../extended/libextended.a $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_3) $(am__DEPENDENCIES_4)
+	$(am__DEPENDENCIES_3) $(am__DEPENDENCIES_4) \
+	$(am__DEPENDENCIES_5)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -243,6 +249,7 @@ MYSQL_CONFIG = @MYSQL_CONFIG@
 MYSQL_INCLUDE_DIR = @MYSQL_INCLUDE_DIR@
 MYSQL_LIBS = @MYSQL_LIBS@
 OBJEXT = @OBJEXT@
+ODBC_LIBS = @ODBC_LIBS@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
 PACKAGE_NAME = @PACKAGE_NAME@
@@ -309,7 +316,8 @@ libcore_a_SOURCES = common.c logging.c transaction_data.c _semaphore.c dbc_manag
 	input_data_generator.c
 
 LDADD = libcore.a ../simple/libsimplesql.a ../extended/libextended.a \
-	$(am__append_1) $(am__append_2) $(am__append_3)
+	$(am__append_1) $(am__append_2) $(am__append_3) \
+	$(am__append_4)
 datagen_SOURCES = datagen.c
 sqlbench_SOURCES = driver_main.c driver.c transaction_queue.c db_threadpool.c terminal_queue.c
 transaction_test_SOURCES = transaction_test.c

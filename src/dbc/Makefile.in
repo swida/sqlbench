@@ -88,6 +88,7 @@ POST_UNINSTALL = :
 @ENABLE_POSTGRESQL_TRUE@am__append_1 = pgsql
 @ENABLE_MYSQL_TRUE@am__append_2 = mysql
 @ENABLE_KINGBASE_TRUE@am__append_3 = kingbase
+@ENABLE_ODBC_TRUE@am__append_4 = odbc
 subdir = src/dbc
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -152,7 +153,7 @@ am__define_uniq_tagged_files = \
   done | $(am__uniquify_input)`
 ETAGS = etags
 CTAGS = ctags
-DIST_SUBDIRS = pgsql mysql kingbase
+DIST_SUBDIRS = pgsql mysql kingbase odbc
 am__DIST_COMMON = $(srcdir)/Makefile.in
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 am__relativize = \
@@ -218,6 +219,7 @@ MYSQL_CONFIG = @MYSQL_CONFIG@
 MYSQL_INCLUDE_DIR = @MYSQL_INCLUDE_DIR@
 MYSQL_LIBS = @MYSQL_LIBS@
 OBJEXT = @OBJEXT@
+ODBC_LIBS = @ODBC_LIBS@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
 PACKAGE_NAME = @PACKAGE_NAME@
@@ -277,7 +279,8 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-SUBDIRS = $(am__append_1) $(am__append_2) $(am__append_3)
+SUBDIRS = $(am__append_1) $(am__append_2) $(am__append_3) \
+	$(am__append_4)
 all: all-recursive
 
 .SUFFIXES:

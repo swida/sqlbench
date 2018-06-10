@@ -164,8 +164,8 @@ pgsql_rollback_transaction(struct db_context_t *_dbc)
 }
 
 static int
-pgsql_sql_execute(struct db_context_t *_dbc, char * query, struct sql_result_t * sql_result,
-				  char * query_name)
+pgsql_sql_execute(struct db_context_t *_dbc, char * query, struct sql_result_t *sql_result,
+				  char *query_name)
 {
 	struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
 	PGresult *res;
