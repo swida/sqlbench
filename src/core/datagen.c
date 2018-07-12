@@ -91,9 +91,20 @@ void escape_me(char *str)
 	}
 }
 
+static void quickdie(const char *errmsg)
+{
+	printf("FATAL: %s\n", errmsg);
+	exit(1);
+}
+
+	
 static int is_valid_stream(output_stream stream)
 {
-	return stream.stream != NULL;
+	int res = stream.stream != NULL;
+	if (!res)
+		quickdie("could not open output stream");
+
+	return res;
 }
 
 static output_stream open_output_stream(int worker_id, char *table_name)
@@ -108,6 +119,8 @@ static int ostprintf(output_stream stream, const char *fmt, ...)
 	va_start(args, fmt);
 	res = (*stream_operation.write_to_stream)(stream, fmt, args);
 	va_end(args);
+	if (res)
+		quickdie("could not write to stream");
 	return res;
 }
 
