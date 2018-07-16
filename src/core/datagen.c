@@ -1020,9 +1020,6 @@ void usage(char *progname)
 	fprintf(stderr, "\tNumber of worker threads within datagen, default is %d\n", jobs);
 	fprintf(stderr, "-d <path>\n");
 	fprintf(stderr, "\toutput path of data files\n");
-	fprintf(stderr, "--direct\n");
-	fprintf(stderr, "\tdon't generate flat files, load directly into database\n");
-
 }
 
 int main(int argc, char *argv[])
