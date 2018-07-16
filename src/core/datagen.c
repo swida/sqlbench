@@ -154,7 +154,7 @@ output_stream open_file_stream(int worker_id, char *table_name)
 
 static int write_to_file_stream(output_stream stream, const char *fmt, va_list ap)
 {
-	return vfprintf(stream.file, fmt, ap);
+	return vfprintf(stream.file, fmt, ap) < 0;
 }
 
 static void close_file_stream(output_stream stream)
