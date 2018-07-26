@@ -89,10 +89,13 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 bin_PROGRAMS = datagen$(EXEEXT) sqlbench$(EXEEXT) \
 	transaction_test$(EXEEXT)
-@ENABLE_POSTGRESQL_TRUE@am__append_1 = ../dbc/pgsql/libdbc_pgsql.a ../storeproc/pgsql/libsppgsql.a -L$(PGSQL_LIB_DIR) -lpq
-@ENABLE_KINGBASE_TRUE@am__append_2 = ../dbc/kingbase/libdbc_kingbase.a $(KINGBASE_LIBS)
-@ENABLE_MYSQL_TRUE@am__append_3 = ../dbc/mysql/libdbc_mysql.a $(MYSQL_LIBS)
-@ENABLE_ODBC_TRUE@am__append_4 = ../dbc/odbc/libdbc_odbc.a $(ODBC_LIBS)
+@ENABLE_POSTGRESQL_TRUE@am__append_1 = ../dbc/pgsql/libdbc_pgsql.a ../storeproc/pgsql/libsppgsql.a $(PGSQL_LIBS)
+@ENABLE_POSTGRESQL_TRUE@am__append_2 = -Wl,-rpath=$(PGSQL_LIB_DIR)
+@ENABLE_KINGBASE_TRUE@am__append_3 = ../dbc/kingbase/libdbc_kingbase.a $(KINGBASE_LIBS)
+@ENABLE_KINGBASE_TRUE@am__append_4 = -Wl,-rpath=$(KINGBASE_LIB_DIR)
+@ENABLE_MYSQL_TRUE@am__append_5 = ../dbc/mysql/libdbc_mysql.a $(MYSQL_LIBS)
+@ENABLE_MYSQL_TRUE@am__append_6 = -Wl,-rpath=$(MYSQL_LIB_DIR)
+@ENABLE_ODBC_TRUE@am__append_7 = ../dbc/odbc/libdbc_odbc.a $(ODBC_LIBS)
 subdir = src/core
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -122,19 +125,20 @@ PROGRAMS = $(bin_PROGRAMS)
 am_datagen_OBJECTS = datagen.$(OBJEXT)
 datagen_OBJECTS = $(am_datagen_OBJECTS)
 datagen_LDADD = $(LDADD)
-@ENABLE_POSTGRESQL_TRUE@am__DEPENDENCIES_1 =  \
+am__DEPENDENCIES_1 =
+@ENABLE_POSTGRESQL_TRUE@am__DEPENDENCIES_2 =  \
 @ENABLE_POSTGRESQL_TRUE@	../dbc/pgsql/libdbc_pgsql.a \
-@ENABLE_POSTGRESQL_TRUE@	../storeproc/pgsql/libsppgsql.a
-am__DEPENDENCIES_2 =
+@ENABLE_POSTGRESQL_TRUE@	../storeproc/pgsql/libsppgsql.a \
+@ENABLE_POSTGRESQL_TRUE@	$(am__DEPENDENCIES_1)
 @ENABLE_KINGBASE_TRUE@am__DEPENDENCIES_3 =  \
 @ENABLE_KINGBASE_TRUE@	../dbc/kingbase/libdbc_kingbase.a \
-@ENABLE_KINGBASE_TRUE@	$(am__DEPENDENCIES_2)
+@ENABLE_KINGBASE_TRUE@	$(am__DEPENDENCIES_1)
 @ENABLE_MYSQL_TRUE@am__DEPENDENCIES_4 = ../dbc/mysql/libdbc_mysql.a \
-@ENABLE_MYSQL_TRUE@	$(am__DEPENDENCIES_2)
+@ENABLE_MYSQL_TRUE@	$(am__DEPENDENCIES_1)
 @ENABLE_ODBC_TRUE@am__DEPENDENCIES_5 = ../dbc/odbc/libdbc_odbc.a \
-@ENABLE_ODBC_TRUE@	$(am__DEPENDENCIES_2)
+@ENABLE_ODBC_TRUE@	$(am__DEPENDENCIES_1)
 datagen_DEPENDENCIES = libcore.a ../simple/libsimplesql.a \
-	../extended/libextended.a $(am__DEPENDENCIES_1) \
+	../extended/libextended.a $(am__DEPENDENCIES_2) \
 	$(am__DEPENDENCIES_3) $(am__DEPENDENCIES_4) \
 	$(am__DEPENDENCIES_5)
 am_sqlbench_OBJECTS = driver_main.$(OBJEXT) driver.$(OBJEXT) \
@@ -143,14 +147,14 @@ am_sqlbench_OBJECTS = driver_main.$(OBJEXT) driver.$(OBJEXT) \
 sqlbench_OBJECTS = $(am_sqlbench_OBJECTS)
 sqlbench_LDADD = $(LDADD)
 sqlbench_DEPENDENCIES = libcore.a ../simple/libsimplesql.a \
-	../extended/libextended.a $(am__DEPENDENCIES_1) \
+	../extended/libextended.a $(am__DEPENDENCIES_2) \
 	$(am__DEPENDENCIES_3) $(am__DEPENDENCIES_4) \
 	$(am__DEPENDENCIES_5)
 am_transaction_test_OBJECTS = transaction_test.$(OBJEXT)
 transaction_test_OBJECTS = $(am_transaction_test_OBJECTS)
 transaction_test_LDADD = $(LDADD)
 transaction_test_DEPENDENCIES = libcore.a ../simple/libsimplesql.a \
-	../extended/libextended.a $(am__DEPENDENCIES_1) \
+	../extended/libextended.a $(am__DEPENDENCIES_2) \
 	$(am__DEPENDENCIES_3) $(am__DEPENDENCIES_4) \
 	$(am__DEPENDENCIES_5)
 AM_V_P = $(am__v_P_@AM_V@)
@@ -239,6 +243,7 @@ INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 KINGBASE_INCLUDE_DIR = @KINGBASE_INCLUDE_DIR@
 KINGBASE_LIBS = @KINGBASE_LIBS@
+KINGBASE_LIB_DIR = @KINGBASE_LIB_DIR@
 LDFLAGS = @LDFLAGS@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
@@ -248,6 +253,7 @@ MKDIR_P = @MKDIR_P@
 MYSQL_CONFIG = @MYSQL_CONFIG@
 MYSQL_INCLUDE_DIR = @MYSQL_INCLUDE_DIR@
 MYSQL_LIBS = @MYSQL_LIBS@
+MYSQL_LIB_DIR = @MYSQL_LIB_DIR@
 OBJEXT = @OBJEXT@
 ODBC_LIBS = @ODBC_LIBS@
 PACKAGE = @PACKAGE@
@@ -259,6 +265,7 @@ PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PGSQL_INCLUDE_DIR = @PGSQL_INCLUDE_DIR@
+PGSQL_LIBS = @PGSQL_LIBS@
 PGSQL_LIB_DIR = @PGSQL_LIB_DIR@
 PG_CONFIG = @PG_CONFIG@
 RANLIB = @RANLIB@
@@ -311,13 +318,13 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 noinst_LIBRARIES = libcore.a
 AM_CPPFLAGS = -I$(top_srcdir)/src/include
-AM_LDFLAGS = -pthread
+AM_LDFLAGS = -pthread $(am__append_2) $(am__append_4) $(am__append_6)
 libcore_a_SOURCES = common.c logging.c transaction_data.c _semaphore.c dbc_manager.c db.c \
 	input_data_generator.c
 
 LDADD = libcore.a ../simple/libsimplesql.a ../extended/libextended.a \
-	$(am__append_1) $(am__append_2) $(am__append_3) \
-	$(am__append_4)
+	$(am__append_1) $(am__append_3) $(am__append_5) \
+	$(am__append_7)
 datagen_SOURCES = datagen.c
 sqlbench_SOURCES = driver_main.c driver.c transaction_queue.c db_threadpool.c terminal_queue.c
 transaction_test_SOURCES = transaction_test.c

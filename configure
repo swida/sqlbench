@@ -635,14 +635,17 @@ CPP
 ENABLE_KINGBASE_FALSE
 ENABLE_KINGBASE_TRUE
 KINGBASE_LIBS
+KINGBASE_LIB_DIR
 KINGBASE_INCLUDE_DIR
 ENABLE_MYSQL_FALSE
 ENABLE_MYSQL_TRUE
 MYSQL_LIBS
+MYSQL_LIB_DIR
 MYSQL_INCLUDE_DIR
 MYSQL_CONFIG
 ENABLE_POSTGRESQL_FALSE
 ENABLE_POSTGRESQL_TRUE
+PGSQL_LIBS
 PGSQL_LIB_DIR
 PGSQL_INCLUDE_DIR
 PG_CONFIG
@@ -4039,13 +4042,16 @@ done
 
 	  PGSQL_INCLUDE_DIR=`$PG_CONFIG --includedir`
 	  PGSQL_LIB_DIR=`$PG_CONFIG --libdir`
+	  PGSQL_LIBS="-L${PGSQL_LIB_DIR} -lpq"
           ;;
 	*)
         PGSQL_INCLUDE_DIR="$withval/include"
         PGSQL_LIB_DIR="$withval/lib"
+	PGSQL_LIBS="-L${PGSQL_LIB_DIR} -lpq"
 	;;
         esac
 	postgresql=yes
+
 
 
 
@@ -4122,14 +4128,17 @@ done
 		as_fn_error $? "*** Command mysql_config not found, you can supply the site path to the --with-mysql option." "$LINENO" 5
 	  fi
 	  MYSQL_INCLUDE_DIR=`$MYSQL_CONFIG --include`
+	  MYSQL_LIB_DIR=`$MYSQL_CONFIG --variable=pkglibdir`
 	  MYSQL_LIBS=`$MYSQL_CONFIG --libs`
 	  ;;
 	  *)
 	  MYSQL_INCLUDE_DIR="-I${withval}/include"
-	  MYSQL_LIBS=-L"${withval}/lib -lmysqlclient"
+	  MYSQL_LIB_DIR="${withval}/lib"
+	  MYSQL_LIBS=-L"${MYSQL_LIB_DIR} -lmysqlclient -lm"
 	  ;;
 	esac
 	mysql=yes
+
 
 
 
@@ -4164,7 +4173,9 @@ if test "${with_kingbase+set}" = set; then :
         esac
 	kingbase=yes
         KINGBASE_INCLUDE_DIR="${withval}/include"
-        KINGBASE_LIBS=-L"${withval}/lib -lkci"
+        KINGBASE_LIB_DIR="${withval}/lib"
+        KINGBASE_LIBS="-L${KINGBASE_LIB_DIR} -lkci"
+
 
 
 

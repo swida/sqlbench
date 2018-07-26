@@ -9,15 +9,18 @@ libcore_a_SOURCES = common.c logging.c transaction_data.c _semaphore.c dbc_manag
 LDADD = libcore.a ../simple/libsimplesql.a ../extended/libextended.a
 
 if ENABLE_POSTGRESQL
-LDADD += ../dbc/pgsql/libdbc_pgsql.a ../storeproc/pgsql/libsppgsql.a -L$(PGSQL_LIB_DIR) -lpq
+LDADD += ../dbc/pgsql/libdbc_pgsql.a ../storeproc/pgsql/libsppgsql.a $(PGSQL_LIBS)
+AM_LDFLAGS += -Wl,-rpath=$(PGSQL_LIB_DIR)
 endif
 
 if ENABLE_KINGBASE
 LDADD += ../dbc/kingbase/libdbc_kingbase.a $(KINGBASE_LIBS)
+AM_LDFLAGS += -Wl,-rpath=$(KINGBASE_LIB_DIR)
 endif
 
 if ENABLE_MYSQL
 LDADD += ../dbc/mysql/libdbc_mysql.a $(MYSQL_LIBS)
+AM_LDFLAGS += -Wl,-rpath=$(MYSQL_LIB_DIR)
 endif
 
 if ENABLE_ODBC

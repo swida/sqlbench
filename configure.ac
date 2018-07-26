@@ -27,15 +27,18 @@ AC_ARG_WITH(postgresql,
 
 	  PGSQL_INCLUDE_DIR=`$PG_CONFIG --includedir`
 	  PGSQL_LIB_DIR=`$PG_CONFIG --libdir`
+	  PGSQL_LIBS="-L${PGSQL_LIB_DIR} -lpq"
           ;;
 	*)
         PGSQL_INCLUDE_DIR="$withval/include"
         PGSQL_LIB_DIR="$withval/lib"
+	PGSQL_LIBS="-L${PGSQL_LIB_DIR} -lpq"
 	;;
         esac
 	postgresql=yes
 	AC_SUBST(PGSQL_INCLUDE_DIR)
 	AC_SUBST(PGSQL_LIB_DIR)
+	AC_SUBST(PGSQL_LIBS)
     ])
 
 AM_CONDITIONAL([ENABLE_POSTGRESQL], [test "$postgresql" = yes])
@@ -57,15 +60,18 @@ AC_ARG_WITH(mysql,
 		AC_MSG_ERROR([*** Command mysql_config not found, you can supply the site path to the --with-mysql option.])
 	  fi
 	  MYSQL_INCLUDE_DIR=`$MYSQL_CONFIG --include`
+	  MYSQL_LIB_DIR=`$MYSQL_CONFIG --variable=pkglibdir`
 	  MYSQL_LIBS=`$MYSQL_CONFIG --libs`
 	  ;;
 	  *)
 	  MYSQL_INCLUDE_DIR="-I${withval}/include"
-	  MYSQL_LIBS=-L"${withval}/lib -lmysqlclient"
+	  MYSQL_LIB_DIR="${withval}/lib"
+	  MYSQL_LIBS=-L"${MYSQL_LIB_DIR} -lmysqlclient -lm"
 	  ;;
 	esac
 	mysql=yes
 	AC_SUBST(MYSQL_INCLUDE_DIR)
+	AC_SUBST(MYSQL_LIB_DIR)
 	AC_SUBST(MYSQL_LIBS)
     ])
 
@@ -87,8 +93,10 @@ AC_ARG_WITH(kingbase,
         esac
 	kingbase=yes
         KINGBASE_INCLUDE_DIR="${withval}/include"
-        KINGBASE_LIBS=-L"${withval}/lib -lkci"
+        KINGBASE_LIB_DIR="${withval}/lib"
+        KINGBASE_LIBS="-L${KINGBASE_LIB_DIR} -lkci"
 	AC_SUBST(KINGBASE_INCLUDE_DIR)
+	AC_SUBST(KINGBASE_LIB_DIR)
 	AC_SUBST(KINGBASE_LIBS)
     ])
 
