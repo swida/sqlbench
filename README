@@ -1,7 +1,7 @@
 create tables
 -------------
 PostgreSQL:
-mysql -f src/scripts/create-tables.sql
+psql -f src/scripts/create-tables.sql
 MySQL:
 mysql < src/scripts/create-tables.sql
 
