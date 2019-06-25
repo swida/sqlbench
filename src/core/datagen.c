@@ -1145,7 +1145,7 @@ parse_dbc_type_done:
 
 	/* Set the correct delimiter. */
 	delimiter = '\t';
-	strcpy(null_str, "");
+	strcpy(null_str, "\\N");
 
 	printf("warehouses = %d\n", warehouses);
 	printf("districts = %d\n", DISTRICT_CARDINALITY);

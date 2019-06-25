@@ -26,7 +26,7 @@ BEGIN
 DECLARE  out_w_name VARCHAR(10);
 DECLARE  out_w_street_1 VARCHAR(20);
 DECLARE  out_w_street_2 VARCHAR(20);
-DECLARE  out_w_city VARCHAR(10);
+DECLARE  out_w_city VARCHAR(20);
 DECLARE  out_w_state VARCHAR(2);
 DECLARE  out_w_zip VARCHAR(9);
 

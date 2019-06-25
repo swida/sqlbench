@@ -4,6 +4,7 @@
 #include "logging.h"
 #include "db.h"
 #include "dbc.h"
+#include <pthread.h>
 
 struct mysql_context_t
 {
@@ -13,11 +14,26 @@ struct mysql_context_t
 };
 
 #define LOAD_BUFFER_SIZE 16384
+enum local_load_status
+{
+	load_starting,
+	load_start_fail,
+	load_started,
+	end_of_load
+};
+
 struct mysql_loader_stream_t
 {
 	struct loader_stream_t base;
 	char buffer[LOAD_BUFFER_SIZE];
 	int cursor;
+	pthread_t local_load_thread;
+	char *table_name;
+	char delimiter;
+	char *null_str;
+	pthread_mutex_t mutex;
+	pthread_cond_t cond;
+	enum local_load_status load_status;
 };
 
 static char my_dbname[32];
@@ -228,69 +244,132 @@ mysql_sql_getvalue(struct db_context_t *_dbc, struct sql_result_t * sql_result, 
 	return tmp;
 }
 
-extern ulong cli_safe_read(MYSQL *mysql);
-extern ulong STDCALL net_field_length(unsigned char **pos);
-
-/* load opreations */
-static struct loader_stream_t *
-mysql_open_loader_stream(struct db_context_t *_dbc, char *table_name, char delimiter, char *null_str)
+static int dbc_local_infile_init(void **ptr, const char *filename, void *userdata)
 {
-	struct mysql_context_t *dbc = (struct mysql_context_t*) _dbc;
+  *ptr = userdata;
+
+  return 0;
+}
+
+static int dbc_local_infile_read(void *ptr, char *buf, unsigned int buf_len)
+{
+	struct mysql_loader_stream_t *stream = (struct mysql_loader_stream_t *) ptr;
+	int len = buf_len;
+	int empty_buf = 0;
+
+	pthread_mutex_lock(&stream->mutex);
+	while (stream->cursor == 0 && stream->load_status != end_of_load)
+		pthread_cond_wait(&stream->cond, &stream->mutex);
+
+	if (stream->cursor == 0 && stream->load_status == end_of_load)
+	{
+		pthread_mutex_unlock(&stream->mutex);
+		return 0;
+	}
+
+	if (len > stream->cursor)
+		len = stream->cursor;
+	memcpy(buf, stream->buffer, len);
+	stream->cursor -= len;
+	if (stream->cursor == 0)
+		empty_buf = 1;
+
+	pthread_mutex_unlock(&stream->mutex);
+	if (empty_buf)
+		pthread_cond_signal(&stream->cond);
+
+	return len;
+}
+
+static void dbc_local_infile_end(void *ptr)
+{
+}
+
+static int
+dbc_local_infile_error(void *ptr,
+                   char *error_msg,
+                   unsigned int error_msg_len)
+{
+  return 0;
+}
+
+static void *data_local_loader(void *arg)
+{
+	struct mysql_loader_stream_t *stream = (struct mysql_loader_stream_t *) arg;
+	struct mysql_context_t *dbc = (struct mysql_context_t*) stream->base.dbc;
+
 	char *buf;
-	struct mysql_loader_stream_t *stream = NULL;
-	NET *net = &dbc->mysql->net;
-	unsigned char *pos;
+
+	mysql_set_local_infile_handler(dbc->mysql, dbc_local_infile_init,
+                                 dbc_local_infile_read,
+                                 dbc_local_infile_end,
+                                 dbc_local_infile_error, stream);
 
 	/* ENABLE AUTOCOMMIT mode for connection when loading data */
     if (mysql_real_query(dbc->mysql, "SET AUTOCOMMIT=1", 16))
     {
 		LOG_ERROR_MESSAGE("count not set autocommit, mysql reports: (%d) %s", mysql_errno(dbc->mysql) ,
 						  mysql_error(dbc->mysql));
-		return NULL;
+		goto _err;
     }
 
-	if ((buf = malloc(strlen(table_name) * 2 + strlen(null_str) + 128)) == NULL)
+	if ((buf = malloc(strlen(stream->table_name) * 2 + strlen(stream->null_str) + 128)) == NULL)
 	{
 		LOG_ERROR_MESSAGE("out of memory\n");
-		return NULL;
+		goto _err;
 	}
 
-	sprintf(buf, "load data local infile '%s' into table %s fields terminated by '%c'", table_name, table_name, delimiter);
+	sprintf(buf, "load data local infile '%s' into table %s fields terminated by '%c'",
+			stream->table_name, stream->table_name, stream->delimiter);
 
-	if (mysql_send_query(dbc->mysql, buf, strlen(buf)))
+	if (mysql_real_query(dbc->mysql, buf, strlen(buf)))
 	{
 		free(buf);
 		LOG_ERROR_MESSAGE("could not execute load data local infile statement: %s",
 						  mysql_error(dbc->mysql));
-		return NULL;
+		goto _err;
 	}
+
 	free(buf);
+	mysql_set_local_infile_default(dbc->mysql);
 
-	if (cli_safe_read(dbc->mysql) == packet_error)
-	{
-		LOG_ERROR_MESSAGE("fail to read data from mysql server: %s",
-						  mysql_error(dbc->mysql));
-		return NULL;
-	}
+	return NULL;
+_err:
+	pthread_mutex_lock(&stream->mutex);
+	stream->load_status = load_start_fail;
+	pthread_mutex_unlock(&stream->mutex);
+	pthread_cond_signal(&stream->cond);
 
-	pos=(unsigned char*) dbc->mysql->net.read_pos;
-	if (net_field_length(&pos) != NULL_LENGTH)
-	{
-		LOG_ERROR_MESSAGE("unexpected packet from mysql server");
-		return NULL;
-	}
+	return NULL;
+}
 
-	if ((stream = malloc(sizeof(struct mysql_loader_stream_t))) == NULL)
+/* load opreations */
+static struct loader_stream_t *
+mysql_open_loader_stream(struct db_context_t *_dbc, char *table_name, char delimiter, char *null_str)
+{
+	struct mysql_context_t *dbc = (struct mysql_context_t*) _dbc;
+	struct mysql_loader_stream_t *stream;
+
+	if (!(stream = malloc(sizeof(struct mysql_loader_stream_t))))
 	{
 		LOG_ERROR_MESSAGE("out of memory\n");
-		(void) my_net_write(net,(const unsigned char*) "",0); /* Server needs one packet */
-		net_flush(net);
-
 		return NULL;
 	}
-
-	stream->base.dbc = (struct db_context_t *)dbc;
 	stream->cursor = 0;
+	stream->base.dbc = (struct db_context_t *)dbc;
+	stream->table_name = table_name;
+	stream->delimiter = delimiter;
+	stream->null_str = null_str;
+
+	stream->load_status = load_starting;
+	pthread_mutex_init(&stream->mutex, NULL);
+	pthread_cond_init(&stream->cond, NULL);
+
+	if (pthread_create(&stream->local_load_thread, NULL, data_local_loader, stream) != 0)
+	{
+		free(stream);
+		stream = NULL;
+	}
 
 	return (struct loader_stream_t *)stream;
 
@@ -302,50 +381,41 @@ mysql_write_to_stream(struct loader_stream_t *_stream, const char *fmt, va_list 
 {
 	struct mysql_loader_stream_t *stream = (struct mysql_loader_stream_t *) _stream;
 	struct mysql_context_t *dbc = (struct mysql_context_t*) stream->base.dbc;
-	NET *net = &dbc->mysql->net;
+
+	pthread_mutex_lock(&stream->mutex);
 
 	stream->cursor += vsprintf(stream->buffer + stream->cursor, fmt, ap);
 
-	if (stream->cursor > MAX_PACK_DATA_LEN)
-	{
-		if (my_net_write(net, stream->buffer, stream->cursor))
-		{
-			LOG_ERROR_MESSAGE("fail to send data to mysql server, server lost.");
-			return -1;
-		}
+	if (stream->cursor > MAX_PACK_DATA_LEN) {
+		pthread_mutex_unlock(&stream->mutex);
+		pthread_cond_signal(&stream->cond);
+		pthread_mutex_lock(&stream->mutex);
 
-		stream->cursor = 0;
+		while (stream->cursor > 0) {
+			if (stream->load_status == load_start_fail) {
+				pthread_mutex_unlock(&stream->mutex);
+				return -1;
+			}
+			pthread_cond_wait(&stream->cond, &stream->mutex);
+		}
 	}
 
+	pthread_mutex_unlock(&stream->mutex);
 	return 0;
 }
-
 
 static int mysql_close_loader_stream(struct loader_stream_t *_stream)
 {
 	struct mysql_loader_stream_t *stream = (struct mysql_loader_stream_t *) _stream;
 	struct mysql_context_t *dbc = (struct mysql_context_t*) stream->base.dbc;
-	NET *net = &dbc->mysql->net;
-	int ret;
+	pthread_mutex_lock(&stream->mutex);
+	stream->load_status = end_of_load;
+	pthread_mutex_unlock(&stream->mutex);
+	pthread_cond_signal(&stream->cond);
 
-	if (stream->cursor > 0 && my_net_write(net, stream->buffer, stream->cursor))
-	{
-		free(stream);
-		LOG_ERROR_MESSAGE("fail to send data to mysql server, server lost.");
-		return -1;
-	}
-
-	/* Send empty packet to mark end of file */
-	if (my_net_write(net, "", 0) || net_flush(net))
-	{
-		ret = -1;
-		LOG_ERROR_MESSAGE("fail to send data to mysql server, server lost.");
-	}
-	mysql_read_query_result(dbc->mysql);
-
+	pthread_join(stream->local_load_thread, NULL);
 	free(stream);
-
-	return ret;
+	return 0;
 }
 
 static struct option *
