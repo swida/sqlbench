@@ -183,6 +183,7 @@ then
 	AC_CONFIG_FILES([
 		src/dbc/mysql/Makefile
 		src/storeproc/mysql/Makefile
+		src/scripts/mysql/Makefile
 	])
 fi
 

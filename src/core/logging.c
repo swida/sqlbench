@@ -57,7 +57,7 @@ int log_error_message(char *filename, int line, const char *fmt, ...)
 	va_start(fmtargs, fmt);
 
 	pthread_mutex_lock(&mutex_error_log);
-	fprintf(of, "%stid:%d %s:%d\n", ctime(&t), (int) pthread_self(),
+	fprintf(of, "%stid:%lu %s:%d\n", ctime(&t), pthread_self(),
 		filename, line);
 	va_start(fmtargs, fmt);
 	vfprintf(of, fmt, fmtargs);
