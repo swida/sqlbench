@@ -2,9 +2,17 @@
 *.a
 *~
 Makefile
+Makefile.in
 .deps
 .dir-locals.el
 /autom4te.cache/
+/aclocal.m4
+/compile
+/config.h.in
+/configure
+/depcomp
+/install-sh
+/missing
 /config.h
 /config.log
 /config.status
