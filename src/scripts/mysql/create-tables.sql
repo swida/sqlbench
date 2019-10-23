@@ -8,7 +8,7 @@ CREATE TABLE warehouse (
     w_zip char(9),
     w_tax REAL,
     w_ytd NUMERIC(24, 12),
-    PRIMARY KEY (w_id));
+    CONSTRAINT pk_warehouse PRIMARY KEY (w_id));
 
 CREATE TABLE district (
     d_id INTEGER,
@@ -22,7 +22,7 @@ CREATE TABLE district (
     d_tax REAL,
     d_ytd NUMERIC(24, 12),
     d_next_o_id INTEGER,
-    PRIMARY KEY (d_w_id, d_id));
+    CONSTRAINT pk_district PRIMARY KEY (d_w_id, d_id));
 
 CREATE TABLE customer (
     c_id INTEGER,
@@ -46,7 +46,7 @@ CREATE TABLE customer (
     c_payment_cnt REAL,
     c_delivery_cnt REAL,
     c_data VARCHAR(500),
-    PRIMARY KEY (c_w_id, c_d_id, c_id));
+    CONSTRAINT pk_customer PRIMARY KEY (c_w_id, c_d_id, c_id));
 
 CREATE TABLE history (
     h_c_id INTEGER,
@@ -62,7 +62,7 @@ CREATE TABLE new_order (
     no_o_id INTEGER,
     no_d_id INTEGER,
     no_w_id INTEGER,
-    PRIMARY KEY (no_w_id, no_d_id, no_o_id));
+    CONSTRAINT pk_new_order PRIMARY KEY (no_w_id, no_d_id, no_o_id));
 
 CREATE TABLE orders (
     o_id INTEGER,
@@ -73,7 +73,7 @@ CREATE TABLE orders (
     o_carrier_id INTEGER,
     o_ol_cnt INTEGER,
     o_all_local REAL,
-    PRIMARY KEY (o_w_id, o_d_id, o_id));
+    CONSTRAINT pk_orders PRIMARY KEY (o_w_id, o_d_id, o_id));
 
 CREATE TABLE order_line (
     ol_o_id INTEGER,
@@ -86,7 +86,7 @@ CREATE TABLE order_line (
     ol_quantity REAL,
     ol_amount REAL,
     ol_dist_info VARCHAR(24),
-    PRIMARY KEY (ol_w_id, ol_d_id, ol_o_id, ol_number));
+    CONSTRAINT pk_order_line PRIMARY KEY (ol_w_id, ol_d_id, ol_o_id, ol_number));
 
 CREATE TABLE item (
     i_id INTEGER,
@@ -94,7 +94,7 @@ CREATE TABLE item (
     i_name VARCHAR(24),
     i_price REAL,
     i_data VARCHAR(50),
-    PRIMARY KEY (i_id));
+    CONSTRAINT pk_item PRIMARY KEY (i_id));
 
 CREATE TABLE stock (
     s_i_id INTEGER,
@@ -114,4 +114,4 @@ CREATE TABLE stock (
     s_order_cnt REAL,
     s_remote_cnt REAL,
     s_data VARCHAR(50),
-    PRIMARY KEY (s_w_id, s_i_id, s_quantity));
+    CONSTRAINT pk_stock PRIMARY KEY (s_w_id, s_i_id, s_quantity));
