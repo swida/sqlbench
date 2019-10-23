@@ -74,6 +74,7 @@ extern struct option * dbc_manager_get_dbcoptions();
 extern int dbc_manager_set_dbcoption(const char *optname, const char *optvalue);
 extern char *dbc_manager_get_name();
 extern int dbc_manager_is_storeproc_supported();
+extern int dbc_manager_is_extended_supported();
 
 extern struct db_context_t *dbc_db_init(void);
 extern int dbc_connect_to_db(struct db_context_t *dbc);

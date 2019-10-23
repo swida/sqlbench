@@ -148,6 +148,15 @@ int dbc_manager_is_storeproc_supported()
 	return _dbc_info->dbc_storeproc_operation != NULL;
 }
 
+int dbc_manager_is_extended_supported()
+{
+	assert(_dbc_info);
+	assert(_dbc_info->dbc_sql_operation);
+	struct dbc_sql_operation_t *sop = _dbc_info->dbc_sql_operation;
+
+	return sop->sql_prepare != NULL;
+}
+
 /* interfaces */
 struct db_context_t *
 dbc_db_init(void)

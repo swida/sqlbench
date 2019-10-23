@@ -143,12 +143,19 @@ int main(int argc, char *argv[])
 	{
 		if(!dbc_manager_is_storeproc_supported())
 		{
-			printf("not support store procedure interface for %s\n", dbc_manager_get_name());
+			printf("%s does not support store procedure interface\n", dbc_manager_get_name());
 			return 1;
 		}
 		printf("use store procedure interface\n");
 	}else if(use_sqlapi_type == SQLAPI_EXTENDED)
+	{
+		if (!dbc_manager_is_extended_supported())
+		{
+			printf("%s does not support extended protocol\n", dbc_manager_get_name());
+			return 1;
+		}
 		printf("use extended sql interface\n");
+	}
 	set_sqlapi_operation(use_sqlapi_type);
 
 	create_pid_file();
