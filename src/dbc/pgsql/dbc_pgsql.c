@@ -322,7 +322,7 @@ pgsql_sql_getvalue(struct db_context_t *_dbc, struct sql_result_t * sql_result, 
 
 /* load opreations */
 static struct loader_stream_t *
-pgsql_open_loader_stream(struct db_context_t *_dbc, char *table_name, char delimiter, char *null_str)
+pgsql_open_loader_stream(struct db_context_t *_dbc, const char *table_name, char delimiter, char *null_str)
 {
   struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
   char *buf;

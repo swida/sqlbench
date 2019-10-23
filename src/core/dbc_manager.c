@@ -301,7 +301,7 @@ int dbc_execsp_stock_level (struct db_context_t *dbc, struct stock_level_t *data
 }
 
 struct loader_stream_t *dbc_open_loader_stream(struct db_context_t *dbc,
-												  char *table_name, char delimiter, char *null_str)
+											   const char *table_name, char delimiter, char *null_str)
 {
   assert(_dbc_info);
   struct dbc_loader_operation_t *lop = _dbc_info->dbc_loader_operation;
@@ -311,13 +311,11 @@ struct loader_stream_t *dbc_open_loader_stream(struct db_context_t *dbc,
 
 int dbc_write_to_loader_stream(struct loader_stream_t *stream, const char *fmt, va_list ap)
 {
-  int res;
   assert(_dbc_info);
   struct dbc_loader_operation_t *lop = _dbc_info->dbc_loader_operation;
   assert(lop);
-  res = (*(lop->write_to_stream))(stream, fmt, ap);
 
-  return res;
+  return (*(lop->write_to_stream))(stream, fmt, ap);
 }
 
 void dbc_close_loader_stream(struct loader_stream_t *stream)

@@ -18,7 +18,6 @@ enum local_load_status
 {
 	load_starting,
 	load_start_fail,
-	load_started,
 	end_of_load
 };
 
@@ -28,7 +27,7 @@ struct mysql_loader_stream_t
 	char buffer[LOAD_BUFFER_SIZE];
 	int cursor;
 	pthread_t local_load_thread;
-	char *table_name;
+	const char *table_name;
 	char delimiter;
 	char *null_str;
 	pthread_mutex_t mutex;
@@ -197,13 +196,7 @@ mysql_sql_fetchrow(struct db_context_t *_dbc, struct sql_result_t * sql_result)
 
 	if ((sql_result->current_row = mysql_fetch_row(sql_result->result_set)) == NULL)
 		return 0;
-#if 0
-	if (sql_result->current_row)
-	{
-		sql_result->lengths= mysql_fetch_lengths(sql_result->result_set);
-		return 1;
-	}
-#endif
+
 	return 1;
 }
 
@@ -251,36 +244,6 @@ static int dbc_local_infile_init(void **ptr, const char *filename, void *userdat
   return 0;
 }
 
-static int dbc_local_infile_read(void *ptr, char *buf, unsigned int buf_len)
-{
-	struct mysql_loader_stream_t *stream = (struct mysql_loader_stream_t *) ptr;
-	int len = buf_len;
-	int empty_buf = 0;
-
-	pthread_mutex_lock(&stream->mutex);
-	while (stream->cursor == 0 && stream->load_status != end_of_load)
-		pthread_cond_wait(&stream->cond, &stream->mutex);
-
-	if (stream->cursor == 0 && stream->load_status == end_of_load)
-	{
-		pthread_mutex_unlock(&stream->mutex);
-		return 0;
-	}
-
-	if (len > stream->cursor)
-		len = stream->cursor;
-	memcpy(buf, stream->buffer, len);
-	stream->cursor -= len;
-	if (stream->cursor == 0)
-		empty_buf = 1;
-
-	pthread_mutex_unlock(&stream->mutex);
-	if (empty_buf)
-		pthread_cond_signal(&stream->cond);
-
-	return len;
-}
-
 static void dbc_local_infile_end(void *ptr)
 {
 }
@@ -293,12 +256,14 @@ dbc_local_infile_error(void *ptr,
   return 0;
 }
 
+static int dbc_local_infile_read(void *ptr, char *buf, unsigned int buf_len);
+
 static void *data_local_loader(void *arg)
 {
 	struct mysql_loader_stream_t *stream = (struct mysql_loader_stream_t *) arg;
 	struct mysql_context_t *dbc = (struct mysql_context_t*) stream->base.dbc;
 
-	char *buf;
+	char *buf = NULL;
 
 	mysql_set_local_infile_handler(dbc->mysql, dbc_local_infile_init,
                                  dbc_local_infile_read,
@@ -308,7 +273,14 @@ static void *data_local_loader(void *arg)
 	/* ENABLE AUTOCOMMIT mode for connection when loading data */
     if (mysql_real_query(dbc->mysql, "SET AUTOCOMMIT=1", 16))
     {
-		LOG_ERROR_MESSAGE("count not set autocommit, mysql reports: (%d) %s", mysql_errno(dbc->mysql) ,
+		LOG_ERROR_MESSAGE("Can not set autocommit to on, mysql reports: (%d) %s", mysql_errno(dbc->mysql) ,
+						  mysql_error(dbc->mysql));
+		goto _err;
+    }
+	/* Default net_read_timeout is 30s, it's so small, set it to 3600 * 24 * 30 */
+    if (mysql_query(dbc->mysql, "set net_read_timeout=2592000"))
+    {
+		LOG_ERROR_MESSAGE("can not enlarge net_read_timeout, mysql reports: (%d) %s", mysql_errno(dbc->mysql) ,
 						  mysql_error(dbc->mysql));
 		goto _err;
     }
@@ -322,30 +294,60 @@ static void *data_local_loader(void *arg)
 	sprintf(buf, "load data local infile '%s' into table %s fields terminated by '%c'",
 			stream->table_name, stream->table_name, stream->delimiter);
 
-	if (mysql_real_query(dbc->mysql, buf, strlen(buf)))
+	if (mysql_query(dbc->mysql, buf))
 	{
-		free(buf);
-		LOG_ERROR_MESSAGE("could not execute load data local infile statement: %s",
-						  mysql_error(dbc->mysql));
+		LOG_ERROR_MESSAGE("could not execute load data local infile statement for table %s: %s",
+						  stream->table_name, mysql_error(dbc->mysql));
 		goto _err;
 	}
 
-	free(buf);
 	mysql_set_local_infile_default(dbc->mysql);
 
+	free(buf);
 	return NULL;
+
 _err:
+	free(buf);
 	pthread_mutex_lock(&stream->mutex);
 	stream->load_status = load_start_fail;
-	pthread_mutex_unlock(&stream->mutex);
 	pthread_cond_signal(&stream->cond);
+	pthread_mutex_unlock(&stream->mutex);
 
 	return NULL;
 }
 
+static int dbc_local_infile_read(void *ptr, char *buf, unsigned int buf_len)
+{
+	struct mysql_loader_stream_t *stream = (struct mysql_loader_stream_t *) ptr;
+	int len = buf_len;
+
+	pthread_mutex_lock(&stream->mutex);
+	while (stream->cursor == 0) {
+		if (stream->load_status == end_of_load) {
+			pthread_mutex_unlock(&stream->mutex);
+			return 0;
+		}
+
+		pthread_cond_wait(&stream->cond, &stream->mutex);
+	}
+
+	if (len > stream->cursor)
+		len = stream->cursor;
+	memcpy(buf, stream->buffer, len);
+	stream->cursor -= len;
+	if (stream->cursor > 0)
+		memmove(stream->buffer, stream->buffer + len, stream->cursor);
+	else if (stream->cursor == 0)
+		pthread_cond_signal(&stream->cond);
+
+	pthread_mutex_unlock(&stream->mutex);
+
+	return len;
+}
+
 /* load opreations */
 static struct loader_stream_t *
-mysql_open_loader_stream(struct db_context_t *_dbc, char *table_name, char delimiter, char *null_str)
+mysql_open_loader_stream(struct db_context_t *_dbc, const char *table_name, char delimiter, char *null_str)
 {
 	struct mysql_context_t *dbc = (struct mysql_context_t*) _dbc;
 	struct mysql_loader_stream_t *stream;
@@ -370,7 +372,6 @@ mysql_open_loader_stream(struct db_context_t *_dbc, char *table_name, char delim
 		free(stream);
 		stream = NULL;
 	}
-
 	return (struct loader_stream_t *)stream;
 
 }
@@ -384,12 +385,8 @@ mysql_write_to_stream(struct loader_stream_t *_stream, const char *fmt, va_list 
 
 	pthread_mutex_lock(&stream->mutex);
 
-	stream->cursor += vsprintf(stream->buffer + stream->cursor, fmt, ap);
-
 	if (stream->cursor > MAX_PACK_DATA_LEN) {
-		pthread_mutex_unlock(&stream->mutex);
 		pthread_cond_signal(&stream->cond);
-		pthread_mutex_lock(&stream->mutex);
 
 		while (stream->cursor > 0) {
 			if (stream->load_status == load_start_fail) {
@@ -399,6 +396,8 @@ mysql_write_to_stream(struct loader_stream_t *_stream, const char *fmt, va_list 
 			pthread_cond_wait(&stream->cond, &stream->mutex);
 		}
 	}
+
+	stream->cursor += vsprintf(stream->buffer + stream->cursor, fmt, ap);
 
 	pthread_mutex_unlock(&stream->mutex);
 	return 0;
@@ -410,10 +409,12 @@ static int mysql_close_loader_stream(struct loader_stream_t *_stream)
 	struct mysql_context_t *dbc = (struct mysql_context_t*) stream->base.dbc;
 	pthread_mutex_lock(&stream->mutex);
 	stream->load_status = end_of_load;
-	pthread_mutex_unlock(&stream->mutex);
 	pthread_cond_signal(&stream->cond);
+	pthread_mutex_unlock(&stream->mutex);
 
 	pthread_join(stream->local_load_thread, NULL);
+	pthread_cond_destroy(&stream->cond);
+	pthread_mutex_destroy(&stream->mutex);
 	free(stream);
 	return 0;
 }

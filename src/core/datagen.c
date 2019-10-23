@@ -37,12 +37,12 @@ typedef union output_stream_t
 
 struct stream_operation_t
 {
-	output_stream (*open_stream)(int worker_id, char *table_name);
+	output_stream (*open_stream)(int worker_id, const char *table_name);
 	int (*write_to_stream)(output_stream stream, const char *fmt, va_list ap);
 	void (*close_stream)(output_stream stream);
 };
 
-static output_stream open_file_stream(int worker_id, char *table_name);
+static output_stream open_file_stream(int worker_id, const char *table_name);
 static int write_to_file_stream(output_stream stream, const char *fmt, va_list ap);
 static void close_file_stream(output_stream stream);
 
@@ -97,7 +97,7 @@ static void quickdie(const char *errmsg)
 	exit(1);
 }
 
-	
+
 static int is_valid_stream(output_stream stream)
 {
 	int res = stream.stream != NULL;
@@ -107,7 +107,7 @@ static int is_valid_stream(output_stream stream)
 	return res;
 }
 
-static output_stream open_output_stream(int worker_id, char *table_name)
+static output_stream open_output_stream(int worker_id, const char *table_name)
 {
 	return (*stream_operation.open_stream)(worker_id, table_name);
 }
@@ -129,7 +129,7 @@ static void close_output_stream(output_stream stream)
 	return (*stream_operation.close_stream)(stream);
 }
 
-output_stream open_file_stream(int worker_id, char *table_name)
+static output_stream open_file_stream(int worker_id, const char *table_name)
 {
 	char buf[1024] = "\0";
 	output_stream ost;
@@ -143,7 +143,7 @@ output_stream open_file_stream(int worker_id, char *table_name)
 		strcat(buf, "/");
 	}
 
-	snprintf(buf, sizeof(buf), "%s%s%d%s", buf, table_name, worker_id, DATAFILE_EXT);
+	snprintf(buf, sizeof(buf), "%s%s%d"DATAFILE_EXT, buf, table_name, worker_id);
 	ost.file = dbclient_command ? popen(buf, "w") : fopen(buf, "w");
 
 	if (ost.file == NULL)
@@ -162,7 +162,7 @@ static void close_file_stream(output_stream stream)
 	fclose(stream.file);
 }
 
-output_stream open_dbloader_stream(int worker_id, char *table_name)
+output_stream open_dbloader_stream(int worker_id, const char *table_name)
 {
 	output_stream ost;
 	struct db_context_t *dbc = db_init();
@@ -188,7 +188,6 @@ static int write_to_dbloader_stream(output_stream stream, const char *fmt, va_li
 static void close_dbloader_stream(output_stream stream)
 {
 	struct db_context_t *dbc = stream.stream->dbc;
-
 	dbc_close_loader_stream(stream.stream);
 	disconnect_from_db(dbc);
 	free(dbc);
@@ -201,9 +200,26 @@ void print_timestamp(output_stream stream, struct tm *date)
 				date->tm_hour, date->tm_min, date->tm_sec);
 }
 
+static void pr_start_4(const char *table, int worker_id, int start, int end)
+{
+	printf("Worker %d is generating %s table data "
+		   "for warehouse [%d, %d] ...\n", worker_id, table, start, end);
+}
+
+static void pr_start_1(const char *table)
+{
+	printf("Generating %s table data ...\n", table);
+}
+
+static void pr_end(const char *table)
+{
+	printf("Finished %s table data ...\n", table);
+}
+
 /* Clause 4.3.3.1 */
 void gen_customers(int worker_id, int start, int end)
 {
+	const char *table = "customer";
 	output_stream output;
 	int i, j, k;
 	char a_string[1024];
@@ -211,9 +227,8 @@ void gen_customers(int worker_id, int start, int end)
 	time_t t1;
 
 	set_random_seed(0);
-	printf("Generating customer table data...\n");
-
-	output = open_output_stream(worker_id, "customer");
+	pr_start_4(table , worker_id, start, end);
+	output = open_output_stream(worker_id, table);
 	if (!is_valid_stream(output))
 		return;
 
@@ -339,22 +354,20 @@ void gen_customers(int worker_id, int start, int end)
 	}
 
 	close_output_stream(output);
-
-	printf("Finished customer table data...\n");
-	return;
+	pr_end(table);
 }
 
 /* Clause 4.3.3.1 */
 void gen_districts(int worker_id, int start, int end)
 {
+	const char *table = "district";
 	output_stream output;
 	int i, j;
 	char a_string[48];
 
 	set_random_seed(0);
-	printf("Generating district table data...\n");
-
-	output = open_output_stream(worker_id, "district");
+	pr_start_4(table, worker_id, start, end);
+	output = open_output_stream(worker_id, table);
 	if (!is_valid_stream(output))
 		return;
 
@@ -419,13 +432,13 @@ void gen_districts(int worker_id, int start, int end)
 
 	close_output_stream(output);
 
-	printf("Finished district table data...\n");
-	return;
+	pr_end(table);
 }
 
 /* Clause 4.3.3.1 */
 void gen_history(int worker_id, int start, int end)
 {
+	const char *table = "history";
 	output_stream output;
 	int i, j, k;
 	char a_string[64];
@@ -433,9 +446,9 @@ void gen_history(int worker_id, int start, int end)
 	time_t t1;
 
 	set_random_seed(0);
-	printf("Generating history table data...\n");
+	pr_start_4(table, worker_id, start, end);
 
-	output = open_output_stream(worker_id, "history");
+	output = open_output_stream(worker_id, table);
 
 	if(!is_valid_stream(output))
 		return;
@@ -489,23 +502,22 @@ void gen_history(int worker_id, int start, int end)
 	}
 
 	close_output_stream(output);
-
-	printf("Finished history table data...\n");
-	return;
+	pr_end(table);
 }
 
 /* Clause 4.3.3.1 */
 void gen_items()
 {
+	const char *table = "item";
 	output_stream output;
 	int i;
 	char a_string[128];
 	int j;
 
 	set_random_seed(0);
-	printf("Generating item table data...\n");
+	pr_start_1(table);
 
-	output = open_output_stream(0, "item");
+	output = open_output_stream(0, table);
 
 	if(!is_valid_stream(output))
 		return;
@@ -542,21 +554,20 @@ void gen_items()
 	}
 
 	close_output_stream(output);
-
-	printf("Finished item table data...\n");
-	return;
+	pr_end(table);
 }
 
 /* Clause 4.3.3.1 */
 void gen_new_orders(int worker_id, int start, int end)
 {
+	const char *table = "new_order";
 	output_stream output;
 	int i, j, k;
 
 	set_random_seed(0);
-	printf("Generating new-order table data...\n");
+	pr_start_4(table, worker_id, start, end);
 
-	output = open_output_stream(worker_id, "new_order");
+	output = open_output_stream(worker_id, table);
 	if(!is_valid_stream(output))
 		return;
 
@@ -580,14 +591,14 @@ void gen_new_orders(int worker_id, int start, int end)
 	}
 
 	close_output_stream(output);
-
-	printf("Finished new-order table data...\n");
-	return;
+	pr_end(table);
 }
 
 /* Clause 4.3.3.1 */
 void gen_orders(int worker_id, int start, int end)
 {
+	const char *order_table = "orders";
+	const char *order_line_table = "order_line";
 	output_stream order, order_line;
 	int i, j, k, l;
 	char a_string[64];
@@ -607,13 +618,13 @@ void gen_orders(int worker_id, int start, int end)
 	int o_ol_cnt;
 
 	set_random_seed(0);
-	printf("Generating order and order-line table data...\n");
+	pr_start_4("orders and order_line", worker_id, start, end);
 
-	order = open_output_stream(worker_id, "orders");
+	order = open_output_stream(worker_id, order_table);
 
 	if(!is_valid_stream(order))
 		return;
-	order_line = open_output_stream(worker_id, "order_line");
+	order_line = open_output_stream(worker_id, order_line_table);
 	if(!is_valid_stream(order_line))
 		return;
 
@@ -776,22 +787,20 @@ void gen_orders(int worker_id, int start, int end)
 	}
 	close_output_stream(order);
 	close_output_stream(order_line);
-
-	printf("Finished order and order-line table data...\n");
-	return;
+	pr_end("orders and order_line");
 }
 
 /* Clause 4.3.3.1 */
 void gen_stock(int worker_id, int start, int end)
 {
+	const char *table = "stock";
 	output_stream output;
 	int i, j, k;
 	char a_string[128];
 
 	set_random_seed(0);
-	printf("Generating stock table data...\n");
-
-	output = open_output_stream(worker_id, "stock");
+	pr_start_4(table, worker_id, start, end);
+	output = open_output_stream(worker_id, table);
 	if (!is_valid_stream(output))
 		return;
 
@@ -885,22 +894,21 @@ void gen_stock(int worker_id, int start, int end)
 	}
 
 	close_output_stream(output);
-
-	printf("Finished stock table data...\n");
-	return;
+	pr_end(table);
 }
 
 /* Clause 4.3.3.1 */
 void gen_warehouses(int worker_id, int start, int end)
 {
+	const char *table = "warehouse";
 	output_stream output;
 	int i;
 	char a_string[48];
 
 	set_random_seed(0);
-	printf("Generating warehouse table data...\n");
+	pr_start_4(table, worker_id, start, end);
 
-	output = open_output_stream(worker_id, "warehouse");
+	output = open_output_stream(worker_id, table);
 	if (!is_valid_stream(output))
 		return;
 
@@ -955,8 +963,7 @@ void gen_warehouses(int worker_id, int start, int end)
 
 	close_output_stream(output);
 
-	printf("Finished warehouse table data...\n");
-	return;
+	pr_end(table);
 }
 
 struct datagen_context_t
@@ -964,7 +971,6 @@ struct datagen_context_t
 	int worker_id;
 	int start_warehouse;
 	int end_warehouse;
-	int gen_items;				/* 1, this worker will gen items data also*/
 };
 
 typedef void (*table_loader)(int workid, int start, int end);
@@ -985,8 +991,6 @@ void *datagen_worker(void *data)
 	int i = 0;
 	struct datagen_context_t *dc = (struct datagen_context_t *) data;
 	int loader = dc->worker_id % table_loader_count;
-	if(dc->gen_items == 1)
-		gen_items();
 	while( i < table_loader_count)
 	{
 		(*table_loaders[loader])(dc->worker_id, dc->start_warehouse, dc->end_warehouse);
@@ -1173,6 +1177,9 @@ parse_dbc_type_done:
 	chunk = warehouses / jobs;
 	rem = warehouses % jobs;
 	curr_end = 1;
+	/* First generate data for items table. */
+	gen_items();
+
 	for(j = 0; j < jobs; j++)
 	{
 		datagen_context[j].worker_id = j;
@@ -1180,16 +1187,11 @@ parse_dbc_type_done:
 		if(rem > 0)
 		{
 			curr_end += chunk + 1;
-			rem --;
+			rem--;
 		}
 		else
 			curr_end += chunk;
 		datagen_context[j].end_warehouse = curr_end - 1;
-		if (j == 0)
-			datagen_context[j].gen_items = 1;
-		else
-			datagen_context[j].gen_items = 0;
-
 		pthread_create(&tid[j], NULL, &datagen_worker, &datagen_context[j]);
 	}
 

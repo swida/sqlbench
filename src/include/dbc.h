@@ -38,7 +38,7 @@ struct loader_stream_t
 
 struct dbc_loader_operation_t
 {
-	struct loader_stream_t *(*open_loader_stream)(struct db_context_t *dbc, char *table_name, char delimiter, char *null_str);
+	struct loader_stream_t *(*open_loader_stream)(struct db_context_t *dbc, const char *table_name, char delimiter, char *null_str);
 	int (*write_to_stream)(struct loader_stream_t *stream, const char *fmt, va_list ap);
 	int (*close_loader_stream)(struct loader_stream_t *stream);
 };
@@ -92,7 +92,7 @@ extern int dbc_sql_close_cursor(struct db_context_t *dbc, struct sql_result_t * 
 extern char * dbc_sql_getvalue(struct db_context_t *dbc, struct sql_result_t * sql_result, int field);
 
 extern struct loader_stream_t *dbc_open_loader_stream(struct db_context_t *dbc,
-												  char *table_name, char delimiter, char *null_str);
+													  const char *table_name, char delimiter, char *null_str);
 extern int dbc_write_to_loader_stream(struct loader_stream_t *stream, const char *fmt, va_list ap);
 extern void dbc_close_loader_stream(struct loader_stream_t *stream);
 
