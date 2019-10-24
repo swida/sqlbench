@@ -43,7 +43,7 @@ int _is_forupdate_supported;
 
 static struct dbc_desc_t dbc_desc = {NULL, NULL};
 static char output_dbc_names[64] = "";
-static char output_dbc_usages[128] = "";
+static char output_dbc_usages[512] = "";
 
 /* user final selected dbc */
 static struct dbc_info_t *_dbc_info = NULL;
@@ -72,8 +72,13 @@ init_dbc_manager()
 	struct dbc_desc_t *curr_desc = dbc_desc.dbc_next;
 	while(curr_desc != NULL)
 	{
-		sprintf(output_dbc_names, "%s %s", output_dbc_names, curr_desc->dbc_info->dbc_name);
-		sprintf(output_dbc_usages, "%s\t%s\n", output_dbc_usages, curr_desc->dbc_info->dbc_usage);
+		int len = strlen(output_dbc_names);
+		output_dbc_names[len++] = ' ';
+		strcpy(output_dbc_names + len, curr_desc->dbc_info->dbc_name);
+		len = strlen(output_dbc_usages);
+		output_dbc_usages[len++] = '\t';
+		strcpy(output_dbc_usages + len, curr_desc->dbc_info->dbc_usage);
+		strcat(output_dbc_usages, "\n");
 		curr_desc = curr_desc->dbc_next;
 	}
 }

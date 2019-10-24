@@ -133,6 +133,7 @@ static output_stream open_file_stream(int worker_id, const char *table_name)
 {
 	char buf[1024] = "\0";
 	output_stream ost;
+	int len;
 
 	if (dbclient_command)
 		snprintf(buf, sizeof(buf), "%s %s %c %s",
@@ -143,7 +144,8 @@ static output_stream open_file_stream(int worker_id, const char *table_name)
 		strcat(buf, "/");
 	}
 
-	snprintf(buf, sizeof(buf), "%s%s%d"DATAFILE_EXT, buf, table_name, worker_id);
+	len = strlen(buf);
+	snprintf(buf + len, sizeof(buf), "%s%d"DATAFILE_EXT, table_name, worker_id);
 	ost.file = dbclient_command ? popen(buf, "w") : fopen(buf, "w");
 
 	if (ost.file == NULL)
@@ -1071,8 +1073,10 @@ parse_dbc_type_done:
 	if(dbms_name[0] != '\0')
 	{
 		if(dbc_manager_set(dbms_name) != OK)
+		{
+			printf("don't support database: %s\n", dbms_name);
 			return ERROR;
-
+		}
 		stream_operation.open_stream = open_dbloader_stream;
 		stream_operation.write_to_stream = write_to_dbloader_stream;
 		stream_operation.close_stream = close_dbloader_stream;
@@ -1135,6 +1139,10 @@ parse_dbc_type_done:
 
 	if (warehouses == 0) {
 		printf("-w must be used\n");
+		return 3;
+	}
+	if (jobs <= 0) {
+		printf("-j jobs must be greater than 0\n");
 		return 3;
 	}
 
