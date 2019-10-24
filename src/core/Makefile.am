@@ -19,7 +19,7 @@ AM_LDFLAGS += -Wl,-rpath=$(KINGBASE_LIB_DIR)
 endif
 
 if ENABLE_MYSQL
-LDADD += ../dbc/mysql/libdbc_mysql.a $(MYSQL_LIBS)
+LDADD += ../dbc/mysql/libdbc_mysql.a ../storeproc/mysql/libspmysql.a $(MYSQL_LIBS)
 AM_LDFLAGS += -Wl,-rpath=$(MYSQL_LIB_DIR)
 endif
 

@@ -354,6 +354,12 @@ odbc_sql_getvalue(struct db_context_t *_dbc,
 	return tmp;
 }
 
+static char *mysql_get_last_error(struct db_context_t *_dbc)
+{
+	struct odbc_context_t *dbc = (struct odbc_context_t*) _dbc;
+	return mysql_error(dbc->mysql);
+}
+
 static struct option *
 odbc_dbc_get_options()
 {

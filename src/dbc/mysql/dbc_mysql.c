@@ -385,7 +385,7 @@ mysql_write_to_stream(struct loader_stream_t *_stream, const char *fmt, va_list 
 
 	pthread_mutex_lock(&stream->mutex);
 
-	if (stream->cursor > MAX_PACK_DATA_LEN) {
+	if (stream->cursor >= MAX_PACK_DATA_LEN) {
 		pthread_cond_signal(&stream->cond);
 
 		while (stream->cursor > 0) {
@@ -512,6 +512,8 @@ static struct dbc_loader_operation_t mysql_loader_operation =
 	mysql_close_loader_stream
 };
 
+extern struct dbc_storeproc_operation_t mysql_storeproc_operation;
+
 int
 mysql_dbc_init()
 {
@@ -521,7 +523,7 @@ mysql_dbc_init()
 	mysql_info->is_forupdate_supported = 0;
 
 	mysql_info->dbc_sql_operation = &mysql_sql_operation;
-	mysql_info->dbc_storeproc_operation = NULL;
+	mysql_info->dbc_storeproc_operation = &mysql_storeproc_operation;
 	mysql_info->dbc_loader_operation = &mysql_loader_operation;
 	mysql_info->dbc_get_options = mysql_dbc_get_options;
 	mysql_info->dbc_set_option = mysql_dbc_set_option;

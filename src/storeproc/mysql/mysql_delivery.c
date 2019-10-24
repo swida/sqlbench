@@ -11,15 +11,20 @@
 
 #include "common.h"
 #include "logging.h"
-#include "pgsql_common.h"
+#include "mysql_common.h"
 #include "dbc.h"
 
-int pgsql_sp_stock_level(struct db_context_t *_dbc, struct stock_level_t *data)
+int mysql_sp_delivery(struct db_context_t *_dbc, struct delivery_t *data)
 {
 	char stmt[128];
 
 	/* Create the query and execute it. */
-	sprintf(stmt, "SELECT stock_level(%d, %d, %d)",
-		data->w_id, data->d_id, data->threshold);
+	sprintf(stmt, "CALL delivery(%d, %d)",
+			data->w_id, data->o_carrier_id);
+
+#ifdef DEBUG_QUERY
+	LOG_ERROR_MESSAGE("execute_delivery stmt: %s\n", stmt);
+#endif
+
 	return dbc_sql_execute(_dbc, stmt, NULL, NULL);
 }
