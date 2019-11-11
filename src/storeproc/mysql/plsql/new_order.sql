@@ -117,13 +117,13 @@ BEGIN
     AND c_d_id = tmp_d_id
     AND c_id = tmp_c_id;
 
-  INSERT INTO new_order (no_o_id, no_d_id, no_w_id)
-  VALUES (out_d_next_o_id, tmp_d_id, tmp_w_id);
-
   INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d,
 	                    o_carrier_id, o_ol_cnt, o_all_local)
   VALUES (out_d_next_o_id, tmp_d_id, tmp_w_id, tmp_c_id,
 	        current_timestamp, NULL, tmp_o_ol_cnt, tmp_o_all_local);
+
+  INSERT INTO new_order (no_o_id, no_d_id, no_w_id)
+  VALUES (out_d_next_o_id, tmp_d_id, tmp_w_id);
 
   SET tmp_total_amount = 0;
 
