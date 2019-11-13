@@ -207,21 +207,9 @@ new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int 
 	{
 		return 13;
 	}
-	sprintf(params[0], "%s", vals[D_NEXT_O_ID]);
-	sprintf(params[1], "%d", w_id);
-	sprintf(params[2], "%d", d_id);
-	num_params = 3;
 
-#ifdef DEBUG_QUERY
-	LOG_ERROR_MESSAGE("%s query: %s, $1 = %s, $2 = %d, $3 = %d\n",
-					  N_NEW_ORDER_5, NEW_ORDER_5, vals[D_NEXT_O_ID],
-					  w_id, d_id);
-#endif
-	if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, N_NEW_ORDER_5))
-	{
-		return 14;
-	}
-	/* the first parameter is same with prevous one */
+	/* Should insert in orders first, because there is a foreign key in new_order */
+	sprintf(params[0], "%s", vals[D_NEXT_O_ID]);
 	sprintf(params[1], "%d", d_id);
 	sprintf(params[2], "%d", w_id);
 	sprintf(params[3], "%d", c_id);
@@ -237,6 +225,22 @@ new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int 
 	if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, N_NEW_ORDER_6))
 	{
 		return 15;
+	}
+
+
+	/* the first parameter is same with prevous one */
+	sprintf(params[1], "%d", w_id);
+	sprintf(params[2], "%d", d_id);
+	num_params = 3;
+
+#ifdef DEBUG_QUERY
+	LOG_ERROR_MESSAGE("%s query: %s, $1 = %s, $2 = %d, $3 = %d\n",
+					  N_NEW_ORDER_5, NEW_ORDER_5, vals[D_NEXT_O_ID],
+					  w_id, d_id);
+#endif
+	if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, N_NEW_ORDER_5))
+	{
+		return 14;
 	}
 
 	rc=0;

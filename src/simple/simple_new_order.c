@@ -158,16 +158,7 @@ int  new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals,
 		return 13;
 	}
 
-	sprintf(query, NEW_ORDER_5, vals[D_NEXT_O_ID] , w_id, d_id);
-
-#ifdef DEBUG_QUERY
-	LOG_ERROR_MESSAGE("NEW_ORDER_5 query: %s\n", query);
-#endif
-	if (!dbc_sql_execute(dbc, query, NULL, "NEW_ORDER_5"))
-	{
-		return 14;
-	}
-
+	/* Should insert in orders first, because there is a foreign key in new_order */
 	sprintf(query, NEW_ORDER_6, vals[D_NEXT_O_ID] , d_id, w_id, c_id, o_ol_cnt, o_all_local);
 
 #ifdef DEBUG_QUERY
@@ -176,6 +167,16 @@ int  new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals,
 	if (!dbc_sql_execute(dbc, query, NULL, "NEW_ORDER_6"))
 	{
 		return 15;
+	}
+
+	sprintf(query, NEW_ORDER_5, vals[D_NEXT_O_ID] , w_id, d_id);
+
+#ifdef DEBUG_QUERY
+	LOG_ERROR_MESSAGE("NEW_ORDER_5 query: %s\n", query);
+#endif
+	if (!dbc_sql_execute(dbc, query, NULL, "NEW_ORDER_5"))
+	{
+		return 14;
 	}
 
 	rc=0;
