@@ -101,8 +101,8 @@ Datum stock_level(PG_FUNCTION_ARGS)
 	args[0] = Int32GetDatum(w_id);
 	args[1] = Int32GetDatum(d_id);
 	args[2] = Int32GetDatum(d_next_o_id - 1);
-	args[4] = Int32GetDatum(d_next_o_id - 20);
-	args[5] = Int32GetDatum(threshold);
+	args[3] = Int32GetDatum(d_next_o_id - 20);
+	args[4] = Int32GetDatum(threshold);
 	ret = SPI_execute_plan(STOCK_LEVEL_2, args, nulls, true, 0);
 	if (ret == SPI_OK_SELECT && SPI_processed > 0) {
 		tupdesc = SPI_tuptable->tupdesc;
