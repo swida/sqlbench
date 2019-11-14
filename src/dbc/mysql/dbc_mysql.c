@@ -51,9 +51,9 @@ mysql_commit_transaction(struct db_context_t *_dbc)
 
 	if (mysql_real_query(dbc->mysql, "COMMIT", 6))
 	{
-        LOG_ERROR_MESSAGE("COMMIT failed. mysql reports: %d %s",
+		LOG_ERROR_MESSAGE("COMMIT failed. mysql reports: %d %s",
 						  mysql_errno(dbc->mysql), mysql_error(dbc->mysql));
-        return ERROR;
+		return ERROR;
 	}
 
 	dbc->inTransaction = 1;
@@ -71,9 +71,9 @@ mysql_rollback_transaction(struct db_context_t *_dbc)
 
 	if (mysql_real_query(dbc->mysql, "ROLLBACK", 8))
 	{
-        LOG_ERROR_MESSAGE("ROLLBACK failed. mysql reports: %d %s",
+		LOG_ERROR_MESSAGE("ROLLBACK failed. mysql reports: %d %s",
 						  mysql_errno(dbc->mysql), mysql_error(dbc->mysql));
-        return ERROR;
+		return ERROR;
 	}
 
 	dbc->inTransaction = 0;
@@ -94,11 +94,11 @@ static int
 mysql_connect_to_db(struct db_context_t *_dbc)
 {
 	struct mysql_context_t *dbc = (struct mysql_context_t*) _dbc;
-    dbc->mysql=mysql_init(NULL);
+	dbc->mysql=mysql_init(NULL);
 
-    //FIXME: change atoi() to strtol() and check for errors
-    if (!mysql_real_connect(dbc->mysql, my_host, my_user, my_pass, my_dbname, atoi(my_port), my_sock, 0))
-    {
+	//FIXME: change atoi() to strtol() and check for errors
+	if (!mysql_real_connect(dbc->mysql, my_host, my_user, my_pass, my_dbname, atoi(my_port), my_sock, 0))
+	{
 		if (mysql_errno(dbc->mysql))
 		{
 			LOG_ERROR_MESSAGE("Connection to database '%s' failed.", my_dbname);
@@ -107,26 +107,26 @@ mysql_connect_to_db(struct db_context_t *_dbc)
 		}
 		dbc->base.need_reconnect = 1;
 		return ERROR;
-    }
+	}
 
-    /* Disable AUTOCOMMIT mode for connection */
-    if (mysql_real_query(dbc->mysql, "SET AUTOCOMMIT=0", 16))
-    {
+	/* Disable AUTOCOMMIT mode for connection */
+	if (mysql_real_query(dbc->mysql, "SET AUTOCOMMIT=0", 16))
+	{
 		LOG_ERROR_MESSAGE("mysql reports: %d %s", mysql_errno(dbc->mysql) ,
 						  mysql_error(dbc->mysql));
 		return ERROR;
-    }
+	}
 
-    if (mysql_real_query(dbc->mysql, "SET SESSION SQL_MODE=concat('NO_BACKSLASH_ESCAPES,', @@sql_mode)", 64))
-    {
+	if (mysql_real_query(dbc->mysql, "SET SESSION SQL_MODE=concat('NO_BACKSLASH_ESCAPES,', @@sql_mode)", 64))
+	{
 		LOG_ERROR_MESSAGE("could disable backslash escapes in mysql session: %d %s", mysql_errno(dbc->mysql) ,
 						  mysql_error(dbc->mysql));
 		return ERROR;
-    }
+	}
 
-    dbc->base.need_reconnect = 0;
+	dbc->base.need_reconnect = 0;
 
-    return OK;
+	return OK;
 }
 
 /* Disconnect from the database and free the connection handle. */
@@ -227,11 +227,11 @@ mysql_sql_getvalue(struct db_context_t *_dbc, struct sql_result_t * sql_result, 
 	}
 	if ((tmp = calloc(sizeof(char), lengths[field]+1)))
 	{
-        memcpy(tmp, ((MYSQL_ROW)(sql_result->current_row))[field], lengths[field]);
+		memcpy(tmp, ((MYSQL_ROW)(sql_result->current_row))[field], lengths[field]);
 	}
 	else
 	{
-        LOG_ERROR_MESSAGE("dbt2_sql_getvalue: CALLOC FAILED for value from field=%d\n", field);
+		LOG_ERROR_MESSAGE("dbt2_sql_getvalue: CALLOC FAILED for value from field=%d\n", field);
 	}
 
 	return tmp;
@@ -250,8 +250,8 @@ static void dbc_local_infile_end(void *ptr)
 
 static int
 dbc_local_infile_error(void *ptr,
-                   char *error_msg,
-                   unsigned int error_msg_len)
+					   char *error_msg,
+					   unsigned int error_msg_len)
 {
   return 0;
 }
@@ -266,24 +266,24 @@ static void *data_local_loader(void *arg)
 	char *buf = NULL;
 
 	mysql_set_local_infile_handler(dbc->mysql, dbc_local_infile_init,
-                                 dbc_local_infile_read,
-                                 dbc_local_infile_end,
-                                 dbc_local_infile_error, stream);
+								   dbc_local_infile_read,
+								   dbc_local_infile_end,
+								   dbc_local_infile_error, stream);
 
 	/* ENABLE AUTOCOMMIT mode for connection when loading data */
-    if (mysql_real_query(dbc->mysql, "SET AUTOCOMMIT=1", 16))
-    {
+	if (mysql_real_query(dbc->mysql, "SET AUTOCOMMIT=1", 16))
+	{
 		LOG_ERROR_MESSAGE("Can not set autocommit to on, mysql reports: (%d) %s", mysql_errno(dbc->mysql) ,
 						  mysql_error(dbc->mysql));
 		goto _err;
-    }
+	}
 	/* Default net_read_timeout is 30s, it's so small, set it to 3600 * 24 * 30 */
-    if (mysql_query(dbc->mysql, "set net_read_timeout=2592000"))
-    {
+	if (mysql_query(dbc->mysql, "set net_read_timeout=2592000"))
+	{
 		LOG_ERROR_MESSAGE("can not enlarge net_read_timeout, mysql reports: (%d) %s", mysql_errno(dbc->mysql) ,
 						  mysql_error(dbc->mysql));
 		goto _err;
-    }
+	}
 
 	if ((buf = malloc(strlen(stream->table_name) * 2 + strlen(stream->null_str) + 128)) == NULL)
 	{

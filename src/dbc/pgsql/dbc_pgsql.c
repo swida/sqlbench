@@ -37,6 +37,7 @@ static char dbname[16][128] = {""};
 static char pgport[32] = "";
 static char pguser[128] = "";
 static char pghost[128] = "";
+static char pgpass[128] = "";
 static int dbname_count = 0;
 static int last_dbname_connected = 0;
 
@@ -100,7 +101,8 @@ pgsql_connect_to_db(struct db_context_t *_dbc)
 		index += snprintf(buf + index, sizeof(buf) - index, "port=%s ", pgport);
 	if (*pguser != '\0')
 		index += snprintf(buf + index, sizeof(buf) - index, "user=%s ", pguser);
-
+	if (*pgpass != '\0')
+		index += snprintf(buf + index, sizeof(buf) - index, "password=%s ", pgpass);
 	dbc->conn = PQconnectdb(buf);
 	if (PQstatus(dbc->conn) != CONNECTION_OK) {
 		LOG_ERROR_MESSAGE("Connection to database '%s' failed.",
@@ -415,7 +417,7 @@ static int pgsql_close_loader_stream(struct loader_stream_t *_stream)
 static struct option *
 pgsql_dbc_get_options()
 {
-#define N_PGSQL_OPT  4
+#define N_PGSQL_OPT  5
 	struct option *dbc_options = malloc(sizeof(struct option) * (N_PGSQL_OPT + 1));
 
 	dbc_options[0].name = "dbname";
@@ -437,6 +439,11 @@ pgsql_dbc_get_options()
 	dbc_options[3].has_arg = required_argument;
 	dbc_options[3].flag = NULL;
 	dbc_options[3].val = 0;
+
+	dbc_options[4].name = "password";
+	dbc_options[4].has_arg = required_argument;
+	dbc_options[4].flag = NULL;
+	dbc_options[4].val = 0;
 
 	dbc_options[N_PGSQL_OPT].name = 0;
 	dbc_options[N_PGSQL_OPT].has_arg = 0;
@@ -467,6 +474,8 @@ pgsql_dbc_set_option(const char *optname, const char *optvalue)
 	}
 	else if(strcmp(optname, "user") == 0 && optvalue != NULL)
 		strncpy(pguser, optvalue, sizeof(pguser));
+	else if(strcmp(optname, "password") == 0 && optvalue != NULL)
+		strncpy(pgpass, optvalue, sizeof(pgpass));
 	return OK;
 }
 
@@ -499,7 +508,7 @@ pgsql_dbc_init()
 {
 	struct dbc_info_t *pgsql_info = make_dbc_info(
 		"postgresql",
-		"for postgresql: --dbname=<dbname> --host=<host> --port=<port> --user=<user>");
+		"for postgresql: --dbname=<dbname> --host=<host> --port=<port> --user=<user> --password=<pass>");
 	pgsql_info->is_forupdate_supported = 0;
 
 	pgsql_info->dbc_sql_operation = &pgsql_sql_operation;
