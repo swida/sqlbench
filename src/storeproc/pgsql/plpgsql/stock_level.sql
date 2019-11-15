@@ -23,6 +23,7 @@ BEGIN
 	AND d_id = in_d_id;
 
 	SELECT COUNT(DISTINCT s_i_id)
+	INTO low_stock
 	FROM order_line, stock
 	WHERE ol_w_id = in_w_id
 	  AND ol_d_id= in_d_id

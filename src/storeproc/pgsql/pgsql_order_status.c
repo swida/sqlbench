@@ -16,9 +16,11 @@
 
 int pgsql_sp_order_status(struct db_context_t *_dbc, struct order_status_t *data)
 {
-	char stmt[128];
+	char stmt[256];
 	/* Create the query and execute it. */
-	sprintf(stmt, "SELECT * FROM order_status(%d, %d, %d, '%s')",
+	sprintf(stmt, "SELECT * FROM order_status(%d, %d, %d, '%s') AS "
+		"order_status(ol_i_id INTEGER, ol_supply_w_id INTEGER, ol_quantity "
+		"REAL, ol_amount REAL, ol_delivery_d TIMESTAMP)",
 			data->c_id, data->c_w_id, data->c_d_id, data->c_last);
 	return dbc_sql_execute(_dbc, stmt, NULL, NULL);
 }

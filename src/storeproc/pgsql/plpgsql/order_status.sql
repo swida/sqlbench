@@ -58,9 +58,7 @@ BEGIN
 	ORDER BY o_id DESC;
 
 	FOR ol IN
-		SELECT out_c_id, out_c_first, out_c_middle, out_c_last,
-		       out_c_balance, out_o_id, out_o_carrier_id,
-		       out_o_entry_d, out_o_ol_cnt, ol_i_id, ol_supply_w_id,
+		SELECT ol_i_id, ol_supply_w_id,
 		       ol_quantity, ol_amount, ol_delivery_d
 		FROM order_line
 		WHERE ol_w_id = in_c_w_id  

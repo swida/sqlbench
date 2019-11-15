@@ -124,13 +124,9 @@ BEGIN
 		SELECT cast(in_w_id AS VARCHAR)
 		INTO tmp_w_id;
 		/* Boo hoo, cannot convert REAL to VARCHAR. */
-/*
 		SELECT cast(in_h_amount AS VARCHAR)
 		INTO tmp_h_amount;
-		out_c_data = tmp_c_id || '' '' || tmp_c_d_id || '' '' || tmp_c_w_id || '' '' || tmp_d_id || '' '' || tmp_w_id || '' '' || tmp_h_amount || '' '' || out_c_data;
-*/
-		out_c_data = tmp_c_id || '' '' || tmp_c_d_id || '' '' || tmp_c_w_id || '' '' || tmp_d_id || '' '' || tmp_w_id || '' '' || out_c_data;
-
+		out_c_data = tmp_c_id || '' '' || tmp_c_d_id || '' '' || tmp_c_w_id || '' '' || tmp_d_id || '' '' || tmp_w_id || '' '' || tmp_h_amount;
 		UPDATE customer
 		SET c_balance = out_c_balance - in_h_amount,
 		    c_ytd_payment = out_c_ytd_payment + 1,
