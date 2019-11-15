@@ -6,25 +6,62 @@
  *
  * Based on TPC-C Standard Specification Revision 5.0 Clause 2.8.2.
  */
-CREATE OR REPLACE FUNCTION new_order (TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) RETURNS INTEGER AS '
+CREATE OR REPLACE FUNCTION new_order (INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER,
+       INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER,
+       INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER,
+       INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER,
+       INTEGER, INTEGER, INTEGER, INTEGER, INTEGER) RETURNS INTEGER AS '
 DECLARE
-	/* Please someone find a better way to do this... 16 arguments max? */
-	in_data ALIAS FOR $1;
-	in_row1 ALIAS FOR $2;
-	in_row2 ALIAS FOR $3;
-	in_row3 ALIAS FOR $4;
-	in_row4 ALIAS FOR $5;
-	in_row5 ALIAS FOR $6;
-	in_row6 ALIAS FOR $7;
-	in_row7 ALIAS FOR $8;
-	in_row8 ALIAS FOR $9;
-	in_row9 ALIAS FOR $10;
-	in_row10 ALIAS FOR $11;
-	in_row11 ALIAS FOR $12;
-	in_row12 ALIAS FOR $13;
-	in_row13 ALIAS FOR $14;
-	in_row14 ALIAS FOR $15;
-	in_row15 ALIAS FOR $16;
+	tmp_w_id ALIAS FOR $1;
+	tmp_d_id ALIAS FOR $2;
+	tmp_c_id ALIAS FOR $3;
+	tmp_o_all_local ALIAS FOR $4;
+	tmp_o_ol_cnt ALIAS FOR $5;
+	tmp_i_id1 ALIAS FOR $6;
+	tmp_ol_supply_w_id1 ALIAS FOR $7;
+	tmp_ol_quantity1 ALIAS FOR $8;
+	tmp_i_id2 ALIAS FOR $9;
+	tmp_ol_supply_w_id2 ALIAS FOR $10;
+	tmp_ol_quantity2 ALIAS FOR $11;
+	tmp_i_id3 ALIAS FOR $12;
+	tmp_ol_supply_w_id3 ALIAS FOR $13;
+	tmp_ol_quantity3 ALIAS FOR $14;
+	tmp_i_id4 ALIAS FOR $15;
+	tmp_ol_supply_w_id4 ALIAS FOR $16;
+	tmp_ol_quantity4 ALIAS FOR $17;
+	tmp_i_id5 ALIAS FOR $18;
+	tmp_ol_supply_w_id5 ALIAS FOR $19;
+	tmp_ol_quantity5 ALIAS FOR $20;
+	tmp_i_id6 ALIAS FOR $21;
+	tmp_ol_supply_w_id6 ALIAS FOR $22;
+	tmp_ol_quantity6 ALIAS FOR $23;
+	tmp_i_id7 ALIAS FOR $24;
+	tmp_ol_supply_w_id7 ALIAS FOR $25;
+	tmp_ol_quantity7 ALIAS FOR $26;
+	tmp_i_id8 ALIAS FOR $27;
+	tmp_ol_supply_w_id8 ALIAS FOR $28;
+	tmp_ol_quantity8 ALIAS FOR $29;
+	tmp_i_id9 ALIAS FOR $30;
+	tmp_ol_supply_w_id9 ALIAS FOR $31;
+	tmp_ol_quantity9 ALIAS FOR $32;
+	tmp_i_id10 ALIAS FOR $33;
+	tmp_ol_supply_w_id10 ALIAS FOR $34;
+	tmp_ol_quantity10 ALIAS FOR $35;
+	tmp_i_id11 ALIAS FOR $36;
+	tmp_ol_supply_w_id11 ALIAS FOR $37;
+	tmp_ol_quantity11 ALIAS FOR $38;
+	tmp_i_id12 ALIAS FOR $39;
+	tmp_ol_supply_w_id12 ALIAS FOR $40;
+	tmp_ol_quantity12 ALIAS FOR $41;
+	tmp_i_id13 ALIAS FOR $42;
+	tmp_ol_supply_w_id13 ALIAS FOR $43;
+	tmp_ol_quantity13 ALIAS FOR $44;
+	tmp_i_id14 ALIAS FOR $45;
+	tmp_ol_supply_w_id14 ALIAS FOR $46;
+	tmp_ol_quantity14 ALIAS FOR $47;
+	tmp_i_id15 ALIAS FOR $48;
+	tmp_ol_supply_w_id15 ALIAS FOR $49;
+	tmp_ol_quantity15 ALIAS FOR $50;
 
 	out_w_tax NUMERIC;
 
@@ -34,15 +71,6 @@ DECLARE
 	out_c_discount NUMERIC;
 	out_c_last VARCHAR;
 	out_c_credit VARCHAR;
-
-	tmp_w_id INTEGER;
-
-	tmp_d_id INTEGER;
-
-	tmp_c_id INTEGER;
-
-	tmp_o_all_local INTEGER;
-	tmp_o_ol_cnt INTEGER;
 
 	tmp_i_id INTEGER;
 	tmp_i_price NUMERIC;
@@ -57,18 +85,6 @@ DECLARE
 
 	tmp_total_amount NUMERIC;
 BEGIN
-	/* Fancy pants fixed width parsing. */
-	SELECT cast(substring(in_data FROM 1 FOR 9) AS INTEGER)
-	INTO tmp_w_id;
-	SELECT cast(substring(in_data FROM 10 FOR 2) AS INTEGER)
-	INTO tmp_d_id;
-	SELECT cast(substring(in_data FROM 12 FOR 5) AS INTEGER)
-	INTO tmp_c_id;
-	SELECT cast(substring(in_data FROM 17 FOR 1) AS INTEGER)
-	INTO tmp_o_all_local;
-	SELECT cast(substring(in_data FROM 18 FOR 2) AS INTEGER)
-	INTO tmp_o_ol_cnt;
-
 	SELECT w_tax
 	INTO out_w_tax
 	FROM warehouse
@@ -104,375 +120,270 @@ BEGIN
 
 	/* More goofy logic. :( */
 	IF tmp_o_ol_cnt > 0 THEN
-		SELECT cast(substring(in_row1 FROM 1 FOR 6) AS INTEGER)
-		INTO tmp_i_id;
-		SELECT cast(substring(in_row1 FROM 7 FOR 9) AS INTEGER)
-		INTO tmp_ol_supply_w_id;
-		SELECT cast(substring(in_row1 FROM 16 FOR 2) AS INTEGER)
-		INTO tmp_ol_quantity;
-
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
-		WHERE i_id = tmp_i_id;
+		WHERE i_id = tmp_i_id1;
 
 		IF tmp_i_price > 0 THEN
-			tmp_ol_amount = tmp_i_price * tmp_ol_quantity;
-			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id,
-		                   	tmp_ol_quantity, tmp_i_price,
+			tmp_ol_amount = tmp_i_price * tmp_ol_quantity1;
+			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id1,
+		                   	tmp_ol_quantity1, tmp_i_price,
 					tmp_i_name, tmp_i_data,
 					out_d_next_o_id, tmp_ol_amount,
-                                   	tmp_ol_supply_w_id, 1)
+                                   	tmp_ol_supply_w_id1, 1)
 			INTO tmp_s_quantity;
 			tmp_total_amount = tmp_total_amount + tmp_ol_amount;
 		ELSE
 			RETURN 1;
 		END IF;
 	ELSIF tmp_o_ol_cnt > 1 THEN
-		SELECT cast(substring(in_row2 FROM 1 FOR 6) AS INTEGER)
-		INTO tmp_i_id;
-		SELECT cast(substring(in_row2 FROM 7 FOR 9) AS INTEGER)
-		INTO tmp_ol_supply_w_id;
-		SELECT cast(substring(in_row2 FROM 16 FOR 2) AS INTEGER)
-		INTO tmp_ol_quantity;
-
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
-		WHERE i_id = tmp_i_id;
+		WHERE i_id = tmp_i_id2;
 
 		IF tmp_i_price > 0 THEN
-			tmp_ol_amount = tmp_i_price * tmp_ol_quantity;
-			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id,
-		                   	tmp_ol_quantity, tmp_i_price,
+			tmp_ol_amount = tmp_i_price * tmp_ol_quantity2;
+			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id2,
+		                   	tmp_ol_quantity2, tmp_i_price,
 					tmp_i_name, tmp_i_data,
 					out_d_next_o_id, tmp_ol_amount,
-                                   	tmp_ol_supply_w_id, 2)
+                                   	tmp_ol_supply_w_id2, 2)
 			INTO tmp_s_quantity;
 			tmp_total_amount = tmp_total_amount + tmp_ol_amount;
 		ELSE
 			RETURN 1;
 		END IF;
 	ELSIF tmp_o_ol_cnt > 2 THEN
-		SELECT cast(substring(in_row3 FROM 1 FOR 6) AS INTEGER)
-		INTO tmp_i_id;
-		SELECT cast(substring(in_row3 FROM 7 FOR 9) AS INTEGER)
-		INTO tmp_ol_supply_w_id;
-		SELECT cast(substring(in_row3 FROM 16 FOR 2) AS INTEGER)
-		INTO tmp_ol_quantity;
-
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
-		WHERE i_id = tmp_i_id;
+		WHERE i_id = tmp_i_id3;
 
 		IF tmp_i_price > 0 THEN
-			tmp_ol_amount = tmp_i_price * tmp_ol_quantity;
-			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id,
-		                   	tmp_ol_quantity, tmp_i_price,
+			tmp_ol_amount = tmp_i_price * tmp_ol_quantity3;
+			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id3,
+		                   	tmp_ol_quantity3, tmp_i_price,
 					tmp_i_name, tmp_i_data,
 					out_d_next_o_id, tmp_ol_amount,
-                                   	tmp_ol_supply_w_id, 3)
+                                   	tmp_ol_supply_w_id3, 3)
 			INTO tmp_s_quantity;
 			tmp_total_amount = tmp_total_amount + tmp_ol_amount;
 		ELSE
 			RETURN 1;
 		END IF;
 	ELSIF tmp_o_ol_cnt > 3 THEN
-		SELECT cast(substring(in_row4 FROM 1 FOR 6) AS INTEGER)
-		INTO tmp_i_id;
-		SELECT cast(substring(in_row4 FROM 7 FOR 9) AS INTEGER)
-		INTO tmp_ol_supply_w_id;
-		SELECT cast(substring(in_row4 FROM 16 FOR 2) AS INTEGER)
-		INTO tmp_ol_quantity;
-
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
-		WHERE i_id = tmp_i_id;
+		WHERE i_id = tmp_i_id4;
 
 		IF tmp_i_price > 0 THEN
-			tmp_ol_amount = tmp_i_price * tmp_ol_quantity;
-			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id,
-		                   	tmp_ol_quantity, tmp_i_price,
+			tmp_ol_amount = tmp_i_price * tmp_ol_quantity4;
+			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id4,
+		                   	tmp_ol_quantity4, tmp_i_price,
 					tmp_i_name, tmp_i_data,
 					out_d_next_o_id, tmp_ol_amount,
-                                   	tmp_ol_supply_w_id, 4)
+                                   	tmp_ol_supply_w_id4, 4)
 			INTO tmp_s_quantity;
 			tmp_total_amount = tmp_total_amount + tmp_ol_amount;
 		ELSE
 			RETURN 1;
 		END IF;
 	ELSIF tmp_o_ol_cnt > 4 THEN
-		SELECT cast(substring(in_row5 FROM 1 FOR 6) AS INTEGER)
-		INTO tmp_i_id;
-		SELECT cast(substring(in_row5 FROM 7 FOR 9) AS INTEGER)
-		INTO tmp_ol_supply_w_id;
-		SELECT cast(substring(in_row5 FROM 16 FOR 2) AS INTEGER)
-		INTO tmp_ol_quantity;
-
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
-		WHERE i_id = tmp_i_id;
+		WHERE i_id = tmp_i_id5;
 
 		IF tmp_i_price > 0 THEN
-			tmp_ol_amount = tmp_i_price * tmp_ol_quantity;
-			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id,
-		                   	tmp_ol_quantity, tmp_i_price,
+			tmp_ol_amount = tmp_i_price * tmp_ol_quantity5;
+			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id5,
+		                   	tmp_ol_quantity5, tmp_i_price,
 					tmp_i_name, tmp_i_data,
 					out_d_next_o_id, tmp_ol_amount,
-                                   	tmp_ol_supply_w_id, 5)
+                                   	tmp_ol_supply_w_id5, 5)
 			INTO tmp_s_quantity;
 			tmp_total_amount = tmp_total_amount + tmp_ol_amount;
 		ELSE
 			RETURN 1;
 		END IF;
 	ELSIF tmp_o_ol_cnt > 5 THEN
-		SELECT cast(substring(in_row6 FROM 1 FOR 6) AS INTEGER)
-		INTO tmp_i_id;
-		SELECT cast(substring(in_row6 FROM 7 FOR 9) AS INTEGER)
-		INTO tmp_ol_supply_w_id;
-		SELECT cast(substring(in_row6 FROM 16 FOR 2) AS INTEGER)
-		INTO tmp_ol_quantity;
-
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
-		WHERE i_id = tmp_i_id;
+		WHERE i_id = tmp_i_id6;
 
 		IF tmp_i_price > 0 THEN
-			tmp_ol_amount = tmp_i_price * tmp_ol_quantity;
-			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id,
-		                   	tmp_ol_quantity, tmp_i_price,
+			tmp_ol_amount = tmp_i_price * tmp_ol_quantity6;
+			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id6,
+		                   	tmp_ol_quantity6, tmp_i_price,
 					tmp_i_name, tmp_i_data,
 					out_d_next_o_id, tmp_ol_amount,
-                                   	tmp_ol_supply_w_id, 6)
+                                   	tmp_ol_supply_w_id6, 6)
 			INTO tmp_s_quantity;
 			tmp_total_amount = tmp_total_amount + tmp_ol_amount;
 		ELSE
 			RETURN 1;
 		END IF;
 	ELSIF tmp_o_ol_cnt > 6 THEN
-		SELECT cast(substring(in_row7 FROM 1 FOR 6) AS INTEGER)
-		INTO tmp_i_id;
-		SELECT cast(substring(in_row7 FROM 7 FOR 9) AS INTEGER)
-		INTO tmp_ol_supply_w_id;
-		SELECT cast(substring(in_row7 FROM 16 FOR 2) AS INTEGER)
-		INTO tmp_ol_quantity;
-
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
-		WHERE i_id = tmp_i_id;
+		WHERE i_id = tmp_i_id7;
 
 		IF tmp_i_price > 0 THEN
-			tmp_ol_amount = tmp_i_price * tmp_ol_quantity;
-			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id,
-		                   	tmp_ol_quantity, tmp_i_price,
+			tmp_ol_amount = tmp_i_price * tmp_ol_quantity7;
+			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id7,
+		                   	tmp_ol_quantity7, tmp_i_price,
 					tmp_i_name, tmp_i_data,
 					out_d_next_o_id, tmp_ol_amount,
-                                   	tmp_ol_supply_w_id, 7)
+                                   	tmp_ol_supply_w_id7, 7)
 			INTO tmp_s_quantity;
 			tmp_total_amount = tmp_total_amount + tmp_ol_amount;
 		ELSE
 			RETURN 1;
 		END IF;
 	ELSIF tmp_o_ol_cnt > 7 THEN
-		SELECT cast(substring(in_row8 FROM 1 FOR 6) AS INTEGER)
-		INTO tmp_i_id;
-		SELECT cast(substring(in_row8 FROM 7 FOR 9) AS INTEGER)
-		INTO tmp_ol_supply_w_id;
-		SELECT cast(substring(in_row8 FROM 16 FOR 2) AS INTEGER)
-		INTO tmp_ol_quantity;
-
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
-		WHERE i_id = tmp_i_id;
+		WHERE i_id = tmp_i_id8;
 
 		IF tmp_i_price > 0 THEN
-			tmp_ol_amount = tmp_i_price * tmp_ol_quantity;
-			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id,
-		                   	tmp_ol_quantity, tmp_i_price,
+			tmp_ol_amount = tmp_i_price * tmp_ol_quantity8;
+			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id8,
+		                   	tmp_ol_quantity8, tmp_i_price,
 					tmp_i_name, tmp_i_data,
 					out_d_next_o_id, tmp_ol_amount,
-                                   	tmp_ol_supply_w_id, 8)
+                                   	tmp_ol_supply_w_id8, 8)
 			INTO tmp_s_quantity;
 			tmp_total_amount = tmp_total_amount + tmp_ol_amount;
 		ELSE
 			RETURN 1;
 		END IF;
 	ELSIF tmp_o_ol_cnt > 8 THEN
-		SELECT cast(substring(in_row9 FROM 1 FOR 6) AS INTEGER)
-		INTO tmp_i_id;
-		SELECT cast(substring(in_row9 FROM 7 FOR 9) AS INTEGER)
-		INTO tmp_ol_supply_w_id;
-		SELECT cast(substring(in_row9 FROM 16 FOR 2) AS INTEGER)
-		INTO tmp_ol_quantity;
-
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
-		WHERE i_id = tmp_i_id;
+		WHERE i_id = tmp_i_id9;
 
 		IF tmp_i_price > 0 THEN
-			tmp_ol_amount = tmp_i_price * tmp_ol_quantity;
-			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id,
-		                   	tmp_ol_quantity, tmp_i_price,
+			tmp_ol_amount = tmp_i_price * tmp_ol_quantity9;
+			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id9,
+		                   	tmp_ol_quantity9, tmp_i_price,
 					tmp_i_name, tmp_i_data,
 					out_d_next_o_id, tmp_ol_amount,
-                                   	tmp_ol_supply_w_id, 9)
+                                   	tmp_ol_supply_w_id9, 9)
 			INTO tmp_s_quantity;
 			tmp_total_amount = tmp_total_amount + tmp_ol_amount;
 		ELSE
 			RETURN 1;
 		END IF;
 	ELSIF tmp_o_ol_cnt > 9 THEN
-		SELECT cast(substring(in_row10 FROM 1 FOR 6) AS INTEGER)
-		INTO tmp_i_id;
-		SELECT cast(substring(in_row10 FROM 7 FOR 9) AS INTEGER)
-		INTO tmp_ol_supply_w_id;
-		SELECT cast(substring(in_row10 FROM 16 FOR 2) AS INTEGER)
-		INTO tmp_ol_quantity;
-
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
-		WHERE i_id = tmp_i_id;
+		WHERE i_id = tmp_i_id10;
 
 		IF tmp_i_price > 0 THEN
-			tmp_ol_amount = tmp_i_price * tmp_ol_quantity;
-			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id,
-		                   	tmp_ol_quantity, tmp_i_price,
+			tmp_ol_amount = tmp_i_price * tmp_ol_quantity10;
+			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id10,
+		                   	tmp_ol_quantity10, tmp_i_price,
 					tmp_i_name, tmp_i_data,
 					out_d_next_o_id, tmp_ol_amount,
-                                   	tmp_ol_supply_w_id, 10)
+                                   	tmp_ol_supply_w_id10, 10)
 			INTO tmp_s_quantity;
 			tmp_total_amount = tmp_total_amount + tmp_ol_amount;
 		ELSE
 			RETURN 1;
 		END IF;
 	ELSIF tmp_o_ol_cnt > 10 THEN
-		SELECT cast(substring(in_row11 FROM 1 FOR 6) AS INTEGER)
-		INTO tmp_i_id;
-		SELECT cast(substring(in_row11 FROM 7 FOR 9) AS INTEGER)
-		INTO tmp_ol_supply_w_id;
-		SELECT cast(substring(in_row11 FROM 16 FOR 2) AS INTEGER)
-		INTO tmp_ol_quantity;
-
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
-		WHERE i_id = tmp_i_id;
+		WHERE i_id = tmp_i_id11;
 
 		IF tmp_i_price > 0 THEN
-			tmp_ol_amount = tmp_i_price * tmp_ol_quantity;
-			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id,
-		                   	tmp_ol_quantity, tmp_i_price,
+			tmp_ol_amount = tmp_i_price * tmp_ol_quantity11;
+			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id11,
+		                   	tmp_ol_quantity11, tmp_i_price,
 					tmp_i_name, tmp_i_data,
 					out_d_next_o_id, tmp_ol_amount,
-                                   	tmp_ol_supply_w_id, 11)
+                                   	tmp_ol_supply_w_id11, 11)
 			INTO tmp_s_quantity;
 			tmp_total_amount = tmp_total_amount + tmp_ol_amount;
 		ELSE
 			RETURN 1;
 		END IF;
 	ELSIF tmp_o_ol_cnt > 11 THEN
-		SELECT cast(substring(in_row12 FROM 1 FOR 6) AS INTEGER)
-		INTO tmp_i_id;
-		SELECT cast(substring(in_row12 FROM 7 FOR 9) AS INTEGER)
-		INTO tmp_ol_supply_w_id;
-		SELECT cast(substring(in_row12 FROM 16 FOR 2) AS INTEGER)
-		INTO tmp_ol_quantity;
-
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
-		WHERE i_id = tmp_i_id;
+		WHERE i_id = tmp_i_id12;
 
 		IF tmp_i_price > 0 THEN
-			tmp_ol_amount = tmp_i_price * tmp_ol_quantity;
-			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id,
-		                   	tmp_ol_quantity, tmp_i_price,
+			tmp_ol_amount = tmp_i_price * tmp_ol_quantity12;
+			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id12,
+		                   	tmp_ol_quantity12, tmp_i_price,
 					tmp_i_name, tmp_i_data,
 					out_d_next_o_id, tmp_ol_amount,
-                                   	tmp_ol_supply_w_id, 12)
+                                   	tmp_ol_supply_w_id12, 12)
 			INTO tmp_s_quantity;
 			tmp_total_amount = tmp_total_amount + tmp_ol_amount;
 		ELSE
 			RETURN 1;
 		END IF;
 	ELSIF tmp_o_ol_cnt > 12 THEN
-		SELECT cast(substring(in_row13 FROM 1 FOR 6) AS INTEGER)
-		INTO tmp_i_id;
-		SELECT cast(substring(in_row13 FROM 7 FOR 9) AS INTEGER)
-		INTO tmp_ol_supply_w_id;
-		SELECT cast(substring(in_row13 FROM 16 FOR 2) AS INTEGER)
-		INTO tmp_ol_quantity;
-
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
-		WHERE i_id = tmp_i_id;
+		WHERE i_id = tmp_i_id13;
 
 		IF tmp_i_price > 0 THEN
-			tmp_ol_amount = tmp_i_price * tmp_ol_quantity;
-			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id,
-		                   	tmp_ol_quantity, tmp_i_price,
+			tmp_ol_amount = tmp_i_price * tmp_ol_quantity13;
+			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id13,
+		                   	tmp_ol_quantity13, tmp_i_price,
 					tmp_i_name, tmp_i_data,
 					out_d_next_o_id, tmp_ol_amount,
-                                   	tmp_ol_supply_w_id, 13)
+                                   	tmp_ol_supply_w_id13, 13)
 			INTO tmp_s_quantity;
 			tmp_total_amount = tmp_total_amount + tmp_ol_amount;
 		ELSE
 			RETURN 1;
 		END IF;
 	ELSIF tmp_o_ol_cnt > 13 THEN
-		SELECT cast(substring(in_row14 FROM 1 FOR 6) AS INTEGER)
-		INTO tmp_i_id;
-		SELECT cast(substring(in_row14 FROM 7 FOR 9) AS INTEGER)
-		INTO tmp_ol_supply_w_id;
-		SELECT cast(substring(in_row14 FROM 16 FOR 2) AS INTEGER)
-		INTO tmp_ol_quantity;
-
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
-		WHERE i_id = tmp_i_id;
+		WHERE i_id = tmp_i_id14;
 
 		IF tmp_i_price > 0 THEN
-			tmp_ol_amount = tmp_i_price * tmp_ol_quantity;
-			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id,
-		                   	tmp_ol_quantity, tmp_i_price,
+			tmp_ol_amount = tmp_i_price * tmp_ol_quantity14;
+			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id14,
+		                   	tmp_ol_quantity14, tmp_i_price,
 					tmp_i_name, tmp_i_data,
 					out_d_next_o_id, tmp_ol_amount,
-                                   	tmp_ol_supply_w_id, 14)
+                                   	tmp_ol_supply_w_id14, 14)
 			INTO tmp_s_quantity;
 			tmp_total_amount = tmp_total_amount + tmp_ol_amount;
 		ELSE
 			RETURN 1;
 		END IF;
 	ELSIF tmp_o_ol_cnt > 14 THEN
-		SELECT cast(substring(in_row15 FROM 1 FOR 6) AS INTEGER)
-		INTO tmp_i_id;
-		SELECT cast(substring(in_row15 FROM 7 FOR 9) AS INTEGER)
-		INTO tmp_ol_supply_w_id;
-		SELECT cast(substring(in_row15 FROM 16 FOR 2) AS INTEGER)
-		INTO tmp_ol_quantity;
-
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
-		WHERE i_id = tmp_i_id;
+		WHERE i_id = tmp_i_id15;
 
 		IF tmp_i_price > 0 THEN
-			tmp_ol_amount = tmp_i_price * tmp_ol_quantity;
-			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id,
-		                   	tmp_ol_quantity, tmp_i_price,
+			tmp_ol_amount = tmp_i_price * tmp_ol_quantity15;
+			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id15,
+		                   	tmp_ol_quantity15, tmp_i_price,
 					tmp_i_name, tmp_i_data,
 					out_d_next_o_id, tmp_ol_amount,
-                                   	tmp_ol_supply_w_id, 15)
+                                   	tmp_ol_supply_w_id15, 15)
 			INTO tmp_s_quantity;
 			tmp_total_amount = tmp_total_amount + tmp_ol_amount;
 		ELSE

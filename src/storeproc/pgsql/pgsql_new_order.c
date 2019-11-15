@@ -27,21 +27,21 @@ int pgsql_sp_new_order(struct db_context_t *_dbc, struct new_order_t *data)
 	sprintf(stmt,
 			"DECLARE mycursor CURSOR FOR SELECT new_order("
 			"%d, %d, %d, %d, %d, "
-			"make_new_order_info(%d, %d, %d), "
-			"make_new_order_info(%d, %d, %d), "
-			"make_new_order_info(%d, %d, %d), "
-			"make_new_order_info(%d, %d, %d), "
-			"make_new_order_info(%d, %d, %d), "
-			"make_new_order_info(%d, %d, %d), "
-			"make_new_order_info(%d, %d, %d), "
-			"make_new_order_info(%d, %d, %d), "
-			"make_new_order_info(%d, %d, %d), "
-			"make_new_order_info(%d, %d, %d), "
-			"make_new_order_info(%d, %d, %d), "
-			"make_new_order_info(%d, %d, %d), "
-			"make_new_order_info(%d, %d, %d), "
-			"make_new_order_info(%d, %d, %d), "
-			"make_new_order_info(%d, %d, %d) )",
+			"%d, %d, %d, "
+			"%d, %d, %d, "
+			"%d, %d, %d, "
+			"%d, %d, %d, "
+			"%d, %d, %d, "
+			"%d, %d, %d, "
+			"%d, %d, %d, "
+			"%d, %d, %d, "
+			"%d, %d, %d, "
+			"%d, %d, %d, "
+			"%d, %d, %d, "
+			"%d, %d, %d, "
+			"%d, %d, %d, "
+			"%d, %d, %d, "
+			"%d, %d, %d)",
 			data->w_id, data->d_id, data->c_id, data->o_all_local,
 			data->o_ol_cnt,
 			data->order_line[0].ol_i_id,

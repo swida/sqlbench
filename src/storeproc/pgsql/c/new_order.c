@@ -123,10 +123,7 @@ static cached_statement statements[] =
 
 /* Prototypes to prevent potential gcc warnings. */
 Datum new_order(PG_FUNCTION_ARGS);
-Datum make_new_order_info(PG_FUNCTION_ARGS);
-
 PG_FUNCTION_INFO_V1(new_order);
-PG_FUNCTION_INFO_V1(make_new_order_info);
 
 Datum new_order(PG_FUNCTION_ARGS)
 {
@@ -174,13 +171,9 @@ Datum new_order(PG_FUNCTION_ARGS)
 
 	/* Loop through the last set of parameters. */
 	for (i = 0, j = 5; i < 15; i++) {
-		bool isnull;
-		HeapTupleHeader  t = PG_GETARG_HEAPTUPLEHEADER(j++);
-		ol_i_id[i] = DatumGetInt32(GetAttributeByName(t, "ol_i_id", &isnull));
-		ol_supply_w_id[i] = DatumGetInt32(GetAttributeByName(t,
-				"ol_supply_w_id", &isnull));
-		ol_quantity[i] = DatumGetInt32(GetAttributeByName(t, "ol_quantity",
-				&isnull));
+		ol_i_id[i] = PG_GETARG_INT32(j++);
+		ol_supply_w_id[i] = PG_GETARG_INT32(j++);
+		ol_quantity[i] = PG_GETARG_INT32(j++);
 	}
 
 	elog(DEBUG1, "%d w_id = %d", (int) getpid(), w_id);
@@ -379,41 +372,4 @@ Datum new_order(PG_FUNCTION_ARGS)
 
 	SPI_finish();
 	PG_RETURN_INT32(0);
-}
-
-Datum make_new_order_info(PG_FUNCTION_ARGS)
-{
-	/* result Datum */
-	Datum result;
-	char** cstr_values;
-	HeapTuple result_tuple;
-
-	/* tuple manipulating variables */
-	TupleDesc tupdesc;
-	AttInMetadata *attinmeta;
-
-	/* loop variables. */
-	int i;
-
-	/* get tupdesc from the type name */
-	tupdesc = RelationNameGetTupleDesc("new_order_info");
-
-	/*
-	 * generate attribute metadata needed later to produce tuples
-	 * from raw C strings
-	 */
-	attinmeta = TupleDescGetAttInMetadata(tupdesc);
-
-	cstr_values = (char **) palloc(3 * sizeof(char *));
-	for(i = 0; i < 3; i++) {
-		cstr_values[i] = (char*) palloc(16 * sizeof(char)); /* 16 bytes */
-		snprintf(cstr_values[i], 16, "%d", PG_GETARG_INT32(i));
-	}
-
-	/* build a tuple */
-	result_tuple = BuildTupleFromCStrings(attinmeta, cstr_values);
-
-	/* make the tuple into a datum */
-	result = HeapTupleGetDatum(result_tuple);
-	return result;
 }
