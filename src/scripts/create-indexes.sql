@@ -28,7 +28,7 @@ PRIMARY KEY (i_id);
 
 ALTER TABLE stock
 ADD CONSTRAINT pk_stock
-PRIMARY KEY (s_w_id, s_i_id, s_quantity);
+PRIMARY KEY (s_w_id, s_i_id);
 
 CREATE INDEX i_orders
 ON orders (o_w_id, o_d_id, o_c_id);

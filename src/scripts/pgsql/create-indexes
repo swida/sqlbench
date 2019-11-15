@@ -145,7 +145,7 @@ PRIMARY KEY (i_id) ${TS_PK_ITEM};
 ${PSQL} -c "
 ALTER TABLE stock
 ADD CONSTRAINT pk_stock
-PRIMARY KEY (s_w_id, s_i_id, s_quantity) ${TS_PK_STOCK};
+PRIMARY KEY (s_w_id, s_i_id) ${TS_PK_STOCK};
 " || exit 1 &
 
 ${PSQL} -c "

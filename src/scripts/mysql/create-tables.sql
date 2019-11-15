@@ -114,4 +114,4 @@ CREATE TABLE stock (
     s_order_cnt REAL,
     s_remote_cnt REAL,
     s_data VARCHAR(50),
-    CONSTRAINT pk_stock PRIMARY KEY (s_w_id, s_i_id, s_quantity));
+    CONSTRAINT pk_stock PRIMARY KEY (s_w_id, s_i_id));
