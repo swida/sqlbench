@@ -1,0 +1,5 @@
+# sqlbench extension
+comment = 'sqlbench c stored functions'
+default_version = '1.0.0'
+module_pathname = '$libdir/sqlbench'
+relocatable = true

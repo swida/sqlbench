@@ -1,11 +1,3 @@
-/*
- * This file is released under the terms of the Artistic License.  Please see
- * the file LICENSE, included in this package, for details.
- *
- * Copyright (C) 2003 Mark Wong & Open Source Development Lab, Inc.
- *
- * Based on TPC-C Standard Specification Revision 5.0 Clause 2.8.2.
- */
 CREATE OR REPLACE FUNCTION new_order_2 (INTEGER, INTEGER, INTEGER, INTEGER, NUMERIC, TEXT, TEXT, INTEGER, NUMERIC, INTEGER, INTEGER) RETURNS INTEGER AS '
 DECLARE
 	in_w_id ALIAS FOR $1;

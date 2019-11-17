@@ -1,0 +1,4 @@
+# plsqlbench extension
+comment = 'sqlbench plpgsql stored functions'
+default_version = '1.0.0'
+relocatable = true

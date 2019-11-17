@@ -18,10 +18,6 @@
 
 #include "dbt2common.h"
 
-#ifdef PG_MODULE_MAGIC
-PG_MODULE_MAGIC;
-#endif
-
 /*
  * Order Status transaction SQL statements.
  */

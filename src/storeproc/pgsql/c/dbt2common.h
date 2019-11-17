@@ -27,11 +27,6 @@ typedef struct
 	SPIPlanPtr plan;		/* plan_queries() stores the prepared plan here */
 } cached_statement;
 
-const char s_dist[10][11] = {
-	"s_dist_01", "s_dist_02", "s_dist_03", "s_dist_04", "s_dist_05",
-	"s_dist_06", "s_dist_07", "s_dist_08", "s_dist_09", "s_dist_10"
-};
-
 /*
  * Prepares all plans in the 'statements' array using SPI_prepare(). The
  * 'statements' array must be terminated by an entry with NULL sql text.

@@ -1,11 +1,3 @@
-/*
- * This file is released under the terms of the Artistic License.  Please see
- * the file LICENSE, included in this package, for details.
- *
- * Copyright (C) 2003 Mark Wong & Open Source Development Lab, Inc.
- *
- * Based on TPC-C Standard Specification Revision 5.0 Clause 2.6.2.
- */
 CREATE OR REPLACE FUNCTION order_status (INTEGER, INTEGER, INTEGER, TEXT) RETURNS SETOF record AS '
 DECLARE
 	in_c_id ALIAS FOR $1;

@@ -27,3 +27,6 @@ Makefile.in
 /src/core/transaction_test
 /src/core/datagen
 /src/utils/post_process
+src/storeproc/pgsql/c/sqlbench.so
+src/storeproc/pgsql/plpgsql/plsqlbench--1.0.0.sql
+

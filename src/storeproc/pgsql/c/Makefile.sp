@@ -1,7 +1,10 @@
-MODULES = delivery new_order order_status payment stock_level
-DATA_built = delivery.sql new_order.sql order_status.sql payment.sql \
-		stock_level.sql
+MODULE_big = sqlbench
+OBJS = delivery.o new_order.o order_status.o payment.o stock_level.o
 
-PG_CPPFLAGS=-g
+EXTENSION = sqlbench
+DATA = sqlbench--1.0.0.sql
+PGFILEDESC = "sqlbench c stored functions"
+
+PG_CPPFLAGS=-g -fno-omit-frame-pointer
 PGXS := $(shell pg_config --pgxs)
 include $(PGXS)

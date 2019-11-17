@@ -17,10 +17,6 @@
 
 #include "dbt2common.h"
 
-#ifdef PG_MODULE_MAGIC
-PG_MODULE_MAGIC;
-#endif
-
 /*
  * Stock Level transaction SQL Statement.
  */
