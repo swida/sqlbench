@@ -260,16 +260,6 @@ Datum new_order(PG_FUNCTION_ARGS)
 	}
 
 	args[0] = Int32GetDatum(d_next_o_id);
-	args[1] = Int32GetDatum(w_id);
-	args[2] = Int32GetDatum(d_id);
-	ret = SPI_execute_plan(NEW_ORDER_5, args, nulls, false, 0);
-	if (ret != SPI_OK_INSERT) {
-		elog(WARNING, "NEW_ORDER_5 failed %d", ret);
-		SPI_finish();
-		PG_RETURN_INT32(14);
-	}
-
-	args[0] = Int32GetDatum(d_next_o_id);
 	args[1] = Int32GetDatum(d_id);
 	args[2] = Int32GetDatum(w_id);
 	args[3] = Int32GetDatum(c_id);
@@ -280,6 +270,16 @@ Datum new_order(PG_FUNCTION_ARGS)
 		elog(WARNING, "NEW_ORDER_6 failed");
 		SPI_finish();
 		PG_RETURN_INT32(15);
+	}
+
+	args[0] = Int32GetDatum(d_next_o_id);
+	args[1] = Int32GetDatum(w_id);
+	args[2] = Int32GetDatum(d_id);
+	ret = SPI_execute_plan(NEW_ORDER_5, args, nulls, false, 0);
+	if (ret != SPI_OK_INSERT) {
+		elog(WARNING, "NEW_ORDER_5 failed %d", ret);
+		SPI_finish();
+		PG_RETURN_INT32(14);
 	}
 
 	for (i = 0; i < o_ol_cnt; i++) {

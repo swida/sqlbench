@@ -75,6 +75,11 @@ static cached_statement statements[] = {
 	{ NULL }
 };
 
+typedef struct
+{
+	TupleDesc   tupdesc;
+	SPITupleTable *tuptable;
+} OrderStatusInfoContext;
 
 /* Prototypes to prevent potential gcc warnings. */
 
@@ -87,10 +92,10 @@ Datum order_status(PG_FUNCTION_ARGS)
 	/* for Set Returning Function (SRF) */
 	FuncCallContext  *funcctx;
 	MemoryContext     oldcontext;
-
+    OrderStatusInfoContext *fctx;
+	SPITupleTable *tuptable;
 	/* tuple manipulating variables */
 	TupleDesc tupdesc;
-	SPITupleTable *tuptable;
 	HeapTuple tuple;
 
 	/* loop variable */
@@ -248,18 +253,30 @@ Datum order_status(PG_FUNCTION_ARGS)
 			SPI_finish();
 			SRF_RETURN_DONE(funcctx);
 		}
+		/* Create a user function context for cross-call persistence */
+		fctx = (OrderStatusInfoContext *) palloc(sizeof(OrderStatusInfoContext));
 
-		/* get tupdesc from the type name */
-		tupdesc = RelationNameGetTupleDesc("status_info");
-
+		/* Construct a tuple descriptor for the result rows. */
+		tupdesc = CreateTemplateTupleDesc(5);
+		TupleDescInitEntry(tupdesc, (AttrNumber) 1, "ol_i_id",
+				   INT4OID, -1, 0);
+		TupleDescInitEntry(tupdesc, (AttrNumber) 2, "ol_supply_w_id",
+				   INT4OID, -1, 0);
+		TupleDescInitEntry(tupdesc, (AttrNumber) 3, "ol_quantity",
+				   FLOAT4OID, -1, 0);
+		TupleDescInitEntry(tupdesc, (AttrNumber) 4, "ol_amount",
+				   FLOAT4OID, -1, 0);
+		TupleDescInitEntry(tupdesc, (AttrNumber) 5, "ol_delivery_d",
+				   TIMESTAMPOID, -1, 0);
+		fctx->tupdesc = BlessTupleDesc(tupdesc);
+		/* save SPI data for use across calls */
+		fctx->tuptable = tuptable;
+		funcctx->user_fctx = fctx;
 		/*
 		 * generate attribute metadata needed later to produce tuples
 		 * from raw C strings
 		 */
 		funcctx->attinmeta = TupleDescGetAttInMetadata(tupdesc);
-
-		/* save SPI data for use across calls */
-		funcctx->user_fctx = tuptable;
 
 		/* total number of tuples to be returned */
 		funcctx->max_calls = count;
@@ -279,8 +296,9 @@ Datum order_status(PG_FUNCTION_ARGS)
 		Datum result;
 		char** cstr_values;
 		HeapTuple result_tuple;
-		tuptable = (SPITupleTable*) funcctx->user_fctx;
-		tupdesc = tuptable->tupdesc;
+		fctx = (OrderStatusInfoContext *) funcctx->user_fctx;
+		tuptable = fctx->tuptable;
+		tupdesc = fctx->tupdesc;
 		tuple = tuptable->vals[funcctx->call_cntr]; /* ith row */
 
 		/* TODO: get rid of the hard coded 5! */
