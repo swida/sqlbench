@@ -81,17 +81,28 @@ BEGIN
 	INTO out_w_tax
 	FROM warehouse
 	WHERE w_id = tmp_w_id;
-
+	IF NOT FOUND THEN
+		RAISE WARNING ''NEW_ORDER_1 failed'';
+		RETURN 10;
+	END IF;
 	SELECT d_tax, d_next_o_id
 	INTO out_d_tax, out_d_next_o_id
 	FROM district
 	WHERE d_w_id = tmp_w_id
 	  AND d_id = tmp_d_id;
-
+	IF NOT FOUND THEN
+		RAISE DEBUG ''NEW_ORDER_3 failed'';
+		RETURN 11;
+	END IF;
 	UPDATE district
 	SET d_next_o_id = d_next_o_id + 1
 	WHERE d_w_id = tmp_w_id
 	  AND d_id = tmp_d_id;
+
+	IF NOT FOUND THEN
+		RAISE WARNING ''NEW_ORDER_3 failed'';
+		RETURN 12;
+	END IF;
 
 	SELECT c_discount, c_last, c_credit
 	INTO out_c_discount, out_c_last, out_c_credit
@@ -99,6 +110,11 @@ BEGIN
 	WHERE c_w_id = tmp_w_id
 	  AND c_d_id = tmp_d_id
 	  AND c_id = tmp_c_id;
+
+	IF NOT FOUND THEN
+		RAISE WARNING ''NEW_ORDER_4 failed'';
+		RETURN 13;
+	END IF;
 
 	INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d,
 	                    o_carrier_id, o_ol_cnt, o_all_local)
@@ -116,6 +132,10 @@ BEGIN
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
 		WHERE i_id = tmp_i_id1;
+		IF NOT FOUND THEN
+			RAISE WARNING ''NEW_ORDER_7 failed'';
+			RETURN 2;
+		END IF;
 
 		IF tmp_i_price > 0 THEN
 			tmp_ol_amount = tmp_i_price * tmp_ol_quantity1;
@@ -135,6 +155,11 @@ BEGIN
 		FROM item
 		WHERE i_id = tmp_i_id2;
 
+		IF NOT FOUND THEN
+			RAISE WARNING ''NEW_ORDER_7 failed'';
+			RETURN 2;
+		END IF;
+
 		IF tmp_i_price > 0 THEN
 			tmp_ol_amount = tmp_i_price * tmp_ol_quantity2;
 			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id2,
@@ -152,6 +177,11 @@ BEGIN
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
 		WHERE i_id = tmp_i_id3;
+
+		IF NOT FOUND THEN
+			RAISE WARNING ''NEW_ORDER_7 failed'';
+			RETURN 2;
+		END IF;
 
 		IF tmp_i_price > 0 THEN
 			tmp_ol_amount = tmp_i_price * tmp_ol_quantity3;
@@ -189,6 +219,11 @@ BEGIN
 		FROM item
 		WHERE i_id = tmp_i_id5;
 
+		IF NOT FOUND THEN
+			RAISE WARNING ''NEW_ORDER_7 failed'';
+			RETURN 2;
+		END IF;
+
 		IF tmp_i_price > 0 THEN
 			tmp_ol_amount = tmp_i_price * tmp_ol_quantity5;
 			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id5,
@@ -206,6 +241,11 @@ BEGIN
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
 		WHERE i_id = tmp_i_id6;
+
+		IF NOT FOUND THEN
+			RAISE WARNING ''NEW_ORDER_7 failed'';
+			RETURN 2;
+		END IF;
 
 		IF tmp_i_price > 0 THEN
 			tmp_ol_amount = tmp_i_price * tmp_ol_quantity6;
@@ -225,6 +265,11 @@ BEGIN
 		FROM item
 		WHERE i_id = tmp_i_id7;
 
+		IF NOT FOUND THEN
+			RAISE WARNING ''NEW_ORDER_7 failed'';
+			RETURN 2;
+		END IF;
+
 		IF tmp_i_price > 0 THEN
 			tmp_ol_amount = tmp_i_price * tmp_ol_quantity7;
 			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id7,
@@ -242,6 +287,11 @@ BEGIN
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
 		WHERE i_id = tmp_i_id8;
+
+		IF NOT FOUND THEN
+			RAISE WARNING ''NEW_ORDER_7 failed'';
+			RETURN 2;
+		END IF;
 
 		IF tmp_i_price > 0 THEN
 			tmp_ol_amount = tmp_i_price * tmp_ol_quantity8;
@@ -261,6 +311,11 @@ BEGIN
 		FROM item
 		WHERE i_id = tmp_i_id9;
 
+		IF NOT FOUND THEN
+			RAISE WARNING ''NEW_ORDER_7 failed'';
+			RETURN 2;
+		END IF;
+
 		IF tmp_i_price > 0 THEN
 			tmp_ol_amount = tmp_i_price * tmp_ol_quantity9;
 			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id9,
@@ -278,6 +333,11 @@ BEGIN
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
 		WHERE i_id = tmp_i_id10;
+
+		IF NOT FOUND THEN
+			RAISE WARNING ''NEW_ORDER_7 failed'';
+			RETURN 2;
+		END IF;
 
 		IF tmp_i_price > 0 THEN
 			tmp_ol_amount = tmp_i_price * tmp_ol_quantity10;
@@ -297,6 +357,11 @@ BEGIN
 		FROM item
 		WHERE i_id = tmp_i_id11;
 
+		IF NOT FOUND THEN
+			RAISE WARNING ''NEW_ORDER_7 failed'';
+			RETURN 2;
+		END IF;
+
 		IF tmp_i_price > 0 THEN
 			tmp_ol_amount = tmp_i_price * tmp_ol_quantity11;
 			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id11,
@@ -314,6 +379,11 @@ BEGIN
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
 		WHERE i_id = tmp_i_id12;
+
+		IF NOT FOUND THEN
+			RAISE WARNING ''NEW_ORDER_7 failed'';
+			RETURN 2;
+		END IF;
 
 		IF tmp_i_price > 0 THEN
 			tmp_ol_amount = tmp_i_price * tmp_ol_quantity12;
@@ -333,6 +403,11 @@ BEGIN
 		FROM item
 		WHERE i_id = tmp_i_id13;
 
+		IF NOT FOUND THEN
+			RAISE WARNING ''NEW_ORDER_7 failed'';
+			RETURN 2;
+		END IF;
+
 		IF tmp_i_price > 0 THEN
 			tmp_ol_amount = tmp_i_price * tmp_ol_quantity13;
 			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id13,
@@ -351,6 +426,11 @@ BEGIN
 		FROM item
 		WHERE i_id = tmp_i_id14;
 
+		IF NOT FOUND THEN
+			RAISE WARNING ''NEW_ORDER_7 failed'';
+			RETURN 2;
+		END IF;
+
 		IF tmp_i_price > 0 THEN
 			tmp_ol_amount = tmp_i_price * tmp_ol_quantity14;
 			SELECT new_order_2(tmp_w_id, tmp_d_id, tmp_i_id14,
@@ -368,6 +448,11 @@ BEGIN
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
 		WHERE i_id = tmp_i_id15;
+
+		IF NOT FOUND THEN
+			RAISE WARNING ''NEW_ORDER_7 failed'';
+			RETURN 2;
+		END IF;
 
 		IF tmp_i_price > 0 THEN
 			tmp_ol_amount = tmp_i_price * tmp_ol_quantity15;
