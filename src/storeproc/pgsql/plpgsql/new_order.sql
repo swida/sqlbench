@@ -133,7 +133,6 @@ BEGIN
 		FROM item
 		WHERE i_id = tmp_i_id1;
 		IF NOT FOUND THEN
-			RAISE WARNING ''NEW_ORDER_7 failed'';
 			RETURN 2;
 		END IF;
 
@@ -149,14 +148,14 @@ BEGIN
 		ELSE
 			RETURN 1;
 		END IF;
-	ELSIF tmp_o_ol_cnt > 1 THEN
+	END IF;
+	IF tmp_o_ol_cnt > 1 THEN
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
 		WHERE i_id = tmp_i_id2;
 
 		IF NOT FOUND THEN
-			RAISE WARNING ''NEW_ORDER_7 failed'';
 			RETURN 2;
 		END IF;
 
@@ -172,14 +171,14 @@ BEGIN
 		ELSE
 			RETURN 1;
 		END IF;
-	ELSIF tmp_o_ol_cnt > 2 THEN
+	END IF;
+	IF tmp_o_ol_cnt > 2 THEN
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
 		WHERE i_id = tmp_i_id3;
 
 		IF NOT FOUND THEN
-			RAISE WARNING ''NEW_ORDER_7 failed'';
 			RETURN 2;
 		END IF;
 
@@ -195,7 +194,8 @@ BEGIN
 		ELSE
 			RETURN 1;
 		END IF;
-	ELSIF tmp_o_ol_cnt > 3 THEN
+	END IF;
+	IF tmp_o_ol_cnt > 3 THEN
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
@@ -213,14 +213,14 @@ BEGIN
 		ELSE
 			RETURN 1;
 		END IF;
-	ELSIF tmp_o_ol_cnt > 4 THEN
+	END IF;
+	IF tmp_o_ol_cnt > 4 THEN
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
 		WHERE i_id = tmp_i_id5;
 
 		IF NOT FOUND THEN
-			RAISE WARNING ''NEW_ORDER_7 failed'';
 			RETURN 2;
 		END IF;
 
@@ -236,14 +236,14 @@ BEGIN
 		ELSE
 			RETURN 1;
 		END IF;
-	ELSIF tmp_o_ol_cnt > 5 THEN
+	END IF;
+	IF tmp_o_ol_cnt > 5 THEN
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
 		WHERE i_id = tmp_i_id6;
 
 		IF NOT FOUND THEN
-			RAISE WARNING ''NEW_ORDER_7 failed'';
 			RETURN 2;
 		END IF;
 
@@ -259,14 +259,14 @@ BEGIN
 		ELSE
 			RETURN 1;
 		END IF;
-	ELSIF tmp_o_ol_cnt > 6 THEN
+	END IF;
+	IF tmp_o_ol_cnt > 6 THEN
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
 		WHERE i_id = tmp_i_id7;
 
 		IF NOT FOUND THEN
-			RAISE WARNING ''NEW_ORDER_7 failed'';
 			RETURN 2;
 		END IF;
 
@@ -282,14 +282,14 @@ BEGIN
 		ELSE
 			RETURN 1;
 		END IF;
-	ELSIF tmp_o_ol_cnt > 7 THEN
+	END IF;
+	IF tmp_o_ol_cnt > 7 THEN
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
 		WHERE i_id = tmp_i_id8;
 
 		IF NOT FOUND THEN
-			RAISE WARNING ''NEW_ORDER_7 failed'';
 			RETURN 2;
 		END IF;
 
@@ -305,14 +305,14 @@ BEGIN
 		ELSE
 			RETURN 1;
 		END IF;
-	ELSIF tmp_o_ol_cnt > 8 THEN
+	END IF;
+	IF tmp_o_ol_cnt > 8 THEN
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
 		WHERE i_id = tmp_i_id9;
 
 		IF NOT FOUND THEN
-			RAISE WARNING ''NEW_ORDER_7 failed'';
 			RETURN 2;
 		END IF;
 
@@ -328,14 +328,14 @@ BEGIN
 		ELSE
 			RETURN 1;
 		END IF;
-	ELSIF tmp_o_ol_cnt > 9 THEN
+	END IF;
+	IF tmp_o_ol_cnt > 9 THEN
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
 		WHERE i_id = tmp_i_id10;
 
 		IF NOT FOUND THEN
-			RAISE WARNING ''NEW_ORDER_7 failed'';
 			RETURN 2;
 		END IF;
 
@@ -351,14 +351,14 @@ BEGIN
 		ELSE
 			RETURN 1;
 		END IF;
-	ELSIF tmp_o_ol_cnt > 10 THEN
+	END IF;
+	IF tmp_o_ol_cnt > 10 THEN
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
 		WHERE i_id = tmp_i_id11;
 
 		IF NOT FOUND THEN
-			RAISE WARNING ''NEW_ORDER_7 failed'';
 			RETURN 2;
 		END IF;
 
@@ -374,14 +374,14 @@ BEGIN
 		ELSE
 			RETURN 1;
 		END IF;
-	ELSIF tmp_o_ol_cnt > 11 THEN
+	END IF;
+	IF tmp_o_ol_cnt > 11 THEN
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
 		WHERE i_id = tmp_i_id12;
 
 		IF NOT FOUND THEN
-			RAISE WARNING ''NEW_ORDER_7 failed'';
 			RETURN 2;
 		END IF;
 
@@ -397,14 +397,14 @@ BEGIN
 		ELSE
 			RETURN 1;
 		END IF;
-	ELSIF tmp_o_ol_cnt > 12 THEN
+	END IF;
+	IF tmp_o_ol_cnt > 12 THEN
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
 		WHERE i_id = tmp_i_id13;
 
 		IF NOT FOUND THEN
-			RAISE WARNING ''NEW_ORDER_7 failed'';
 			RETURN 2;
 		END IF;
 
@@ -420,14 +420,14 @@ BEGIN
 		ELSE
 			RETURN 1;
 		END IF;
-	ELSIF tmp_o_ol_cnt > 13 THEN
+	END IF;
+	IF tmp_o_ol_cnt > 13 THEN
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
 		WHERE i_id = tmp_i_id14;
 
 		IF NOT FOUND THEN
-			RAISE WARNING ''NEW_ORDER_7 failed'';
 			RETURN 2;
 		END IF;
 
@@ -443,14 +443,14 @@ BEGIN
 		ELSE
 			RETURN 1;
 		END IF;
-	ELSIF tmp_o_ol_cnt > 14 THEN
+	END IF;
+	IF tmp_o_ol_cnt > 14 THEN
 		SELECT i_price, i_name, i_data
 		INTO tmp_i_price, tmp_i_name, tmp_i_data
 		FROM item
 		WHERE i_id = tmp_i_id15;
 
 		IF NOT FOUND THEN
-			RAISE WARNING ''NEW_ORDER_7 failed'';
 			RETURN 2;
 		END IF;
 
