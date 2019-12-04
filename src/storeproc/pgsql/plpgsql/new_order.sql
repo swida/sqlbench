@@ -89,7 +89,8 @@ BEGIN
 	INTO out_d_tax, out_d_next_o_id
 	FROM district
 	WHERE d_w_id = tmp_w_id
-	  AND d_id = tmp_d_id;
+	  AND d_id = tmp_d_id
+	FOR UPDATE;
 	IF NOT FOUND THEN
 		RAISE DEBUG ''NEW_ORDER_3 failed'';
 		RETURN 11;
