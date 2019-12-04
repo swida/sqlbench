@@ -85,10 +85,12 @@ int generate_new_order_data(int w_id, struct new_order_t *data)
 				data->order_line[i].ol_supply_w_id =
 					get_random(
 					table_cardinality.warehouses) + 1;
-				if (data->order_line[i].ol_supply_w_id >=
-					w_id) {
+
+				if (data->order_line[i].ol_supply_w_id == w_id)
 					++data->order_line[i].ol_supply_w_id;
-				}
+
+				if (data->order_line[i].ol_supply_w_id > table_cardinality.warehouses)
+					data->order_line[i].ol_supply_w_id = 1;
 			}
 		} else {
 			data->order_line[i].ol_supply_w_id = 1;
