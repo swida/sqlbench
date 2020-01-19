@@ -188,21 +188,6 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if(no_thinktime)
-	{
-		key_time.delivery = 0;
-		key_time.new_order = 0;
-		key_time.order_status = 0;
-		key_time.payment = 0;
-		key_time.stock_level = 0;
-
-		think_time.delivery = 0;
-		think_time.new_order = 0;
-		think_time.order_status = 0;
-		think_time.payment = 0;
-		think_time.stock_level = 0;
-	}
-
 	if (strlen(output_path) > 0 && ((stat(output_path, &st) < 0) ||
 			(st.st_mode & S_IFMT) != S_IFDIR)) {
 		printf("Output directory of data files '%s' not exists\n", output_path);
@@ -287,7 +272,17 @@ int main(int argc, char *argv[])
 	}
 
 	start_db_threadpool();
-	start_driver();
+
+	if (no_thinktime == 0)
+	{
+		start_drivers();
+		wait_drivers_finish();
+	}
+
+	db_threadpool_destroy();
+
+	if (no_thinktime == 0)
+		destroy_drivers();
 
 	return 0;
 }

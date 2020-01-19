@@ -52,6 +52,9 @@ int terminals_per_thread = 50;
 
 extern int exiting;
 
+pthread_t *driver_tids;
+int started_driver_count = 0;
+
 int create_pid_file()
 {
 	FILE * fpid;
@@ -264,15 +267,14 @@ void _format_time(char *disp_str, int len, time_t t)
 	strftime(disp_str, len, "%F %T", tm_disp);
 }
 
-int start_driver()
+void start_drivers()
 {
 	int i;
 	struct timespec ts, rem;
 	char tm_disp_str[200];
-	pthread_t* tids;
 	int threads_start_time;
+
 	/* Just used to count the number of threads created. */
-	int count = 0;
 	int thread_count = ((w_id_max - w_id_min + 1) * terminals_per_warehouse +
 			    terminals_per_thread - 1) / terminals_per_thread;
 
@@ -291,7 +293,7 @@ int start_driver()
 	printf("will stop test at time %s\n", tm_disp_str);
 
 	/* allocate g_tid */
-	tids = malloc(sizeof(pthread_t) * thread_count);
+	driver_tids = malloc(sizeof(pthread_t) * thread_count);
 	init_termworker_array(thread_count);
 	start_time = (int) time(NULL);
 	pthread_mutex_lock(&mutex_mix_log);
@@ -307,15 +309,15 @@ int start_driver()
 
 		if (pthread_attr_init(&attr) != 0) {
 			LOG_ERROR_MESSAGE("could not init pthread attr: %d", i);
-			return ERROR;
+			break;
 		}
 
 		if (pthread_attr_setstacksize(&attr, stacksize) != 0) {
 			LOG_ERROR_MESSAGE("could not set pthread stack size: %d", i);
-			return ERROR;
+			break;
 		}
 
-		ret = pthread_create(&tids[i], &attr, &terminals_worker, tc);
+		ret = pthread_create(&driver_tids[i], &attr, &terminals_worker, tc);
 
 		if (ret != 0) {
 			perror("pthread_create");
@@ -323,12 +325,12 @@ int start_driver()
 			if (ret == EAGAIN) {
 				LOG_ERROR_MESSAGE( "not enough system resources: %d", i);
 			}
-			return ERROR;
+			break;
 		}
 
-		++count;
-		if (count % 20 == 0) {
-			printf("%d / %d threads started...\n", count, thread_count);
+		++started_driver_count;
+		if (started_driver_count % 20 == 0) {
+			printf("%d / %d threads started...\n", started_driver_count, thread_count);
 			fflush(stdout);
 		}
 
@@ -345,35 +347,35 @@ int start_driver()
 		}
 		pthread_attr_destroy(&attr);
 	}
-
 	printf("terminals started...\n");
 
 	sleep(duration_rampup - threads_start_time);
+}
+
+void wait_drivers_finish()
+{
 	/* Note that the driver has started up all threads in the log. */
 	pthread_mutex_lock(&mutex_mix_log);
 	fprintf(log_mix, "%d,START,,,\n", (int) time(NULL) - start_time);
 	pthread_mutex_unlock(&mutex_mix_log);
 	fflush(log_mix);
 	printf("steady status started...\n");
+
 	/* wait until all threads quit */
-	for (i = 0; i < thread_count; i++) {
-		if (pthread_join(tids[i], NULL) != 0) {
+	for (int i = 0; i < started_driver_count; i++) {
+		if (pthread_join(driver_tids[i], NULL) != 0) {
 			LOG_ERROR_MESSAGE("error join terminal thread");
-			return ERROR;
 		}
-		count --;
 	}
-	free(tids);
-	do {
-		/* Loop until all the DB worker threads have exited. */
-		exiting = 1;
-		signal_transaction_queue();
-		sem_getvalue(&db_worker_count, &count);
-		sleep(1);
-	} while (count > 0);
-	destroy_termworker_array(thread_count);
-	printf("driver is exiting normally\n");
-	return OK;
+
+	free(driver_tids);
+
+	printf("drivers are exiting normally\n");
+}
+
+void destroy_drivers()
+{
+	destroy_termworker_array(started_driver_count);
 }
 
 void log_transaction_mix(int transaction, char code, double response_time, unsigned int term_id)

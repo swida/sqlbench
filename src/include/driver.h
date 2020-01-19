@@ -81,7 +81,10 @@ int set_client_port(int port);
 int set_duration(int seconds);
 int set_table_cardinality(int table, int cardinality);
 int set_transaction_mix(int transaction, double mix);
-int start_driver();
+void start_drivers();
+void wait_drivers_finish();
+void destroy_drivers();
+
 void log_transaction_mix(int transaction, char code, double response_time, unsigned int term_id);
 int start_db_threadpool(void);
 

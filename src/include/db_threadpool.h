@@ -12,7 +12,5 @@
 extern sem_t db_worker_count;
 extern int db_connections;
 extern int db_conn_sleep;
-extern int *worker_count;
-extern time_t *last_txn;
 
 int db_threadpool_init();

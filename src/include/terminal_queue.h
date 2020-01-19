@@ -30,6 +30,7 @@ struct termworker_context_t
 	struct terminal_queue_t term_queue;
 };
 
+char generate_transaction(int *keying_time, int *mean_think_time);
 void enqueue_terminal(int termworker_id, int term);
 struct terminal_t *dequeue_terminal(int termworker_id, unsigned int *delay);
 void init_termworker_array(int thread_count);
