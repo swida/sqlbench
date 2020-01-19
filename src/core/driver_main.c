@@ -16,6 +16,7 @@
 #include <string.h>
 #include <math.h>
 #include <sys/stat.h>
+#include <signal.h>
 #include <common.h>
 #include <logging.h>
 #include <driver.h>
@@ -30,6 +31,12 @@ int no_thinktime = 0;
 /* use store procedure to test */
 enum sqlapi_type use_sqlapi_type = SQLAPI_SIMPLE;
 int parse_arguments(int argc, char *argv[]);
+
+static void sig_int_hander(int sig)
+{
+	fprintf(stderr, "Interrupt by user, exiting ...\n");
+	exiting = 1;
+}
 
 int main(int argc, char *argv[])
 {
@@ -270,6 +277,8 @@ int main(int argc, char *argv[])
 	   printf("You used wrong parameters or something wrong with database.\n");
 	   return 1;
 	}
+
+	signal(SIGINT, sig_int_hander);
 
 	start_db_threadpool();
 

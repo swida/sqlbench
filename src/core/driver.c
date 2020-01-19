@@ -306,7 +306,8 @@ void start_drivers()
 		size_t stacksize = 131072; /* 128 kilobytes. */
 
 		struct termworker_context_t *tc = init_termworker_context(i, thread_count);
-
+		if (exiting)
+			break;
 		if (pthread_attr_init(&attr) != 0) {
 			LOG_ERROR_MESSAGE("could not init pthread attr: %d", i);
 			break;
@@ -466,7 +467,7 @@ void *terminals_worker(void *data)
 
 		enqueue_transaction(node);
 
-	} while (time(NULL) < stop_time);
+	} while (!exiting && time(NULL) < stop_time);
 
 	/* Note when each thread has exited. */
 	pthread_mutex_lock(&mutex_mix_log);

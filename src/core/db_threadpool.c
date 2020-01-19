@@ -46,12 +46,13 @@ int startup();
 int db_connections = 0;
 int db_conn_sleep = 1000; /* milliseconds */
 struct db_worker_desc_t *db_worker_desc;
+pthread_t *db_worker_tids;
+int db_worker_started = 0;
 
 /* These should probably be handled differently. */
 extern int exiting;
 extern int no_thinktime;
 extern int start_time;
-
 sem_t db_worker_count;
 
 static struct transaction_queue_node_t *db_get_transaction(
@@ -212,6 +213,7 @@ int db_threadpool_init()
         }
 
 		db_worker_desc = (struct db_worker_desc_t *) malloc(sizeof(struct db_worker_desc_t) * db_connections);
+		db_worker_tids = (pthread_t *) malloc(sizeof(pthread_t) + db_connections);
 
         ts.tv_sec = (time_t) db_conn_sleep / 1000;
         ts.tv_nsec = (long) (db_conn_sleep % 1000) * 1000000;
@@ -223,62 +225,66 @@ int db_threadpool_init()
 		}
 
         for (i = 0; i < db_connections; i++) {
-                int ret;
-                pthread_t tid;
-                pthread_attr_t attr;
-                size_t stacksize = 262144; /* 256 kilobytes. */
+			int ret;
+			pthread_t tid;
+			pthread_attr_t attr;
+			size_t stacksize = 262144; /* 256 kilobytes. */
+			if (exiting)
+				break;
+			/*
+			 * Is it possible for i to change before db_worker can copy it?
+			 */
+			if (pthread_attr_init(&attr) != 0) {
+				LOG_ERROR_MESSAGE("could not init pthread attr");
+				return ERROR;
+			}
+			if (pthread_attr_setstacksize(&attr, stacksize) != 0) {
+				LOG_ERROR_MESSAGE("could not set pthread stack size");
+				return ERROR;
+			}
+			db_worker_desc[i].id = i;
+			if (no_thinktime != 0) {
+				db_worker_desc[i].start_term = i * term_per_conn;
+				db_worker_desc[i].curr_term = db_worker_desc[i].start_term;
+				if(i == db_connections - 1)
+					db_worker_desc[i].end_term = total_terms;
+				else
+					db_worker_desc[i].end_term = (i + 1) * term_per_conn;
+			}
 
-                /*
-                 * Is it possible for i to change before db_worker can copy it?
-                 */
-                if (pthread_attr_init(&attr) != 0) {
-                        LOG_ERROR_MESSAGE("could not init pthread attr");
-                        return ERROR;
-                }
-                if (pthread_attr_setstacksize(&attr, stacksize) != 0) {
-                        LOG_ERROR_MESSAGE("could not set pthread stack size");
-                        return ERROR;
-                }
-				db_worker_desc[i].id = i;
-				if (no_thinktime != 0) {
-					db_worker_desc[i].start_term = i * term_per_conn;
-					db_worker_desc[i].curr_term = db_worker_desc[i].start_term;
-					if(i == db_connections - 1)
-						db_worker_desc[i].end_term = total_terms;
-					else
-						db_worker_desc[i].end_term = (i + 1) * term_per_conn;
+			ret = pthread_create(&db_worker_tids[i], &attr, &db_worker, &db_worker_desc[i]);
+			if (ret != 0) {
+				LOG_ERROR_MESSAGE("error creating db thread");
+				if (ret == EAGAIN) {
+					LOG_ERROR_MESSAGE(
+						"not enough system resources");
 				}
+				return ERROR;
+			}
+			db_worker_started++;
 
-				ret = pthread_create(&tid, &attr, &db_worker, &db_worker_desc[i]);
-                if (ret != 0) {
-                        LOG_ERROR_MESSAGE("error creating db thread");
-                        if (ret == EAGAIN) {
-                                LOG_ERROR_MESSAGE(
-                                        "not enough system resources");
-                        }
-                        return ERROR;
-                }
+			/* Keep a count of how many DB worker threads have started. */
+			sem_post(&db_worker_count);
 
-                /* Keep a count of how many DB worker threads have started. */
-                sem_post(&db_worker_count);
-				if ((i + 1) % 20 == 0) {
-					printf("%d / %d db connections opened...\n", i + 1, db_connections);
-					fflush(stdout);
+			if ((i + 1) % 20 == 0) {
+				printf("%d / %d db connections opened...\n", i + 1, db_connections);
+				fflush(stdout);
+			}
+
+			/* Don't let the database connection attempts occur too fast. */
+			while (nanosleep(&ts, &rem) == -1) {
+				if (errno == EINTR) {
+					memcpy(&ts, &rem, sizeof(struct timespec));
+				} else {
+					LOG_ERROR_MESSAGE(
+						"sleep time invalid %d s %ls ns",
+						ts.tv_sec, ts.tv_nsec);
+					break;
 				}
-
-                /* Don't let the database connection attempts occur too fast. */
-				while (nanosleep(&ts, &rem) == -1) {
-                        if (errno == EINTR) {
-                                memcpy(&ts, &rem, sizeof(struct timespec));
-                        } else {
-                                LOG_ERROR_MESSAGE(
-                                        "sleep time invalid %d s %ls ns",
-                                        ts.tv_sec, ts.tv_nsec);
-                                break;
-                        }
-                }
-				pthread_attr_destroy(&attr);
+			}
+			pthread_attr_destroy(&attr);
         }
+
         return OK;
 }
 
@@ -287,16 +293,22 @@ void db_threadpool_destroy()
 	int count;
 	if (no_thinktime != 0) {
 		time_t stop_time = time(NULL) + duration + duration_rampup;
-		while (time(NULL) < stop_time)
+		while (!exiting && time(NULL) < stop_time)
 			sleep(1);
 	}
+
 	printf("DB worker threads are exiting normally\n");
-	do {
-		/* Loop until all the DB worker threads have exited. */
-		exiting = 1;
+
+	exiting = 1;
+	signal_transaction_queue();
+	sem_getvalue(&db_worker_count, &count);
+	while(count > 0) {
 		signal_transaction_queue();
 		sem_getvalue(&db_worker_count, &count);
-		sleep(1);
-	} while (count > 0);
+	}
+
+	for(int i = 0; i < db_worker_started; i++) {
+		pthread_join(db_worker_tids[i], NULL);
+	}
 }
 

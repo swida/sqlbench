@@ -14,3 +14,4 @@ extern int db_connections;
 extern int db_conn_sleep;
 
 int db_threadpool_init();
+int db_threadpool_destroy();
