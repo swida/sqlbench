@@ -445,14 +445,11 @@ void *terminals_worker(void *data)
 		node = &term->node;
 		client_data = &node->client_data;
 
-		w_id = term->id % (w_id_max - w_id_min + 1) + w_id_min;
-		d_id = term->id / (w_id_max - w_id_min + 1) + 1;
+		w_id = term->id / terminals_per_warehouse + w_id_min;
+		d_id = term->id % terminals_per_warehouse + 1;
 
 #ifdef DEBUG
-		printf("executing transaction %c\n",
-			   transaction_short_name[client_data->transaction]);
-		fflush(stdout);
-		LOG_ERROR_MESSAGE("executing transaction %c",
+		LOG_ERROR_MESSAGE("executing transaction[w:%d, d:%d] %c",w_id, d_id,
 						  transaction_short_name[client_data->transaction]);
 #endif /* DEBUG */
 
