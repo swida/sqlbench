@@ -156,6 +156,12 @@ int get_think_time(int mean_think_time)
 	return (-1.0 * log(get_percentage() + 0.000001) * mean_think_time);
 }
 
+void format_time(char *disp_str, int len, time_t t)
+{
+	struct tm *tm_disp = localtime(&t);
+	strftime(disp_str, len, "%F %T", tm_disp);
+}
+
 int init_common()
 {
 	int i, j;

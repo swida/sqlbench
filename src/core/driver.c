@@ -38,14 +38,13 @@ struct transaction_mix_t transaction_mix;
 struct key_time_t key_time;
 struct think_time_t think_time;
 int duration = 0;
-int stop_time = 0;
-int start_time = 0;
+time_t start_time = 0;
+time_t stop_time;
 int w_id_min = 0, w_id_max = 0;
 int terminals_per_warehouse = 0;
 unsigned int seed = -1;
-int client_conn_sleep = 1000; /* milliseconds */
 int duration_rampup = 0;
-FILE *log_mix = NULL;
+static FILE *log_mix = NULL;
 pthread_mutex_t mutex_mix_log = PTHREAD_MUTEX_INITIALIZER;
 
 int terminals_per_thread = 50;
@@ -261,45 +260,29 @@ int start_db_threadpool(void)
 	return OK;
 }
 
-void _format_time(char *disp_str, int len, time_t t)
-{
-	struct tm *tm_disp = localtime(&t);
-	strftime(disp_str, len, "%F %T", tm_disp);
-}
-
 void start_drivers()
 {
 	int i;
-	struct timespec ts, rem;
-	char tm_disp_str[200];
-	int threads_start_time;
-
+	struct timespec rem;
+	char tm_disp_str[64];
+	time_t now, rampup_time;
 	/* Just used to count the number of threads created. */
 	int thread_count = ((w_id_max - w_id_min + 1) * terminals_per_warehouse +
 			    terminals_per_thread - 1) / terminals_per_thread;
-
-	ts.tv_sec = (time_t) (client_conn_sleep / 1000);
-	ts.tv_nsec = (long) (client_conn_sleep % 1000) * 1000000;
-
-	/* Caulculate when the test should stop. */
-	threads_start_time = (int) ((double) client_conn_sleep / 1000.0 * thread_count);
-	if(threads_start_time > duration_rampup)
-		duration_rampup = threads_start_time;
-	stop_time = time(NULL) + duration + duration_rampup;
-	_format_time(tm_disp_str, sizeof(tm_disp_str), time(NULL));
+	start_time = (int) time(NULL);
+	rampup_time = start_time + duration_rampup;
+	stop_time = rampup_time + duration;
+	format_time(tm_disp_str, sizeof(tm_disp_str), start_time);
 	printf("driver is starting to ramp up at time %s\n", tm_disp_str);
 	printf("driver will ramp up in %d seconds\n", duration_rampup);
-	_format_time(tm_disp_str, sizeof(tm_disp_str), stop_time);
+	format_time(tm_disp_str, sizeof(tm_disp_str), stop_time);
 	printf("will stop test at time %s\n", tm_disp_str);
 
 	/* allocate g_tid */
 	driver_tids = malloc(sizeof(pthread_t) * thread_count);
 	init_termworker_array(thread_count);
-	start_time = (int) time(NULL);
-	pthread_mutex_lock(&mutex_mix_log);
-	fprintf(log_mix, "0,RAMPUP,,,%d\n", start_time);
-	pthread_mutex_unlock(&mutex_mix_log);
-	fflush(log_mix);
+
+	log_rampup_start();
 	for (i = 0; i < thread_count; i++) {
 		int ret;
 		pthread_attr_t attr;
@@ -335,31 +318,19 @@ void start_drivers()
 			fflush(stdout);
 		}
 
-		/* Sleep for between starting terminals. */
-		while (nanosleep(&ts, &rem) == -1) {
-			if (errno == EINTR) {
-				memcpy(&ts, &rem, sizeof(struct timespec));
-			} else {
-				LOG_ERROR_MESSAGE(
-					"sleep time invalid %d s %ls ns",
-					ts.tv_sec, ts.tv_nsec);
-				break;
-			}
-		}
 		pthread_attr_destroy(&attr);
 	}
 	printf("terminals started...\n");
 
-	sleep(duration_rampup - threads_start_time);
+	now = time(NULL);
+	if (now < rampup_time)
+		sleep(rampup_time - now);
 }
 
 void wait_drivers_finish()
 {
 	/* Note that the driver has started up all threads in the log. */
-	pthread_mutex_lock(&mutex_mix_log);
-	fprintf(log_mix, "%d,START,,,\n", (int) time(NULL) - start_time);
-	pthread_mutex_unlock(&mutex_mix_log);
-	fflush(log_mix);
+	log_testing_start();
 	printf("steady status started...\n");
 
 	/* wait until all threads quit */
@@ -379,13 +350,28 @@ void destroy_drivers()
 	destroy_termworker_array(started_driver_count);
 }
 
+void log_rampup_start()
+{
+	pthread_mutex_lock(&mutex_mix_log);
+	fprintf(log_mix, "0,RAMPUP,,,%ld\n", start_time);
+	pthread_mutex_unlock(&mutex_mix_log);
+	fflush(log_mix);
+}
+
+void log_testing_start()
+{
+	pthread_mutex_lock(&mutex_mix_log);
+	fprintf(log_mix, "%ld,START,,,\n", time(NULL) - start_time);
+	pthread_mutex_unlock(&mutex_mix_log);
+	fflush(log_mix);
+}
+
 void log_transaction_mix(int transaction, char code, double response_time, unsigned int term_id)
 {
 	pthread_mutex_lock(&mutex_mix_log);
 	fprintf(log_mix, "%d,%c,%c,%f,%d\n", (int) (time(NULL) - start_time),
 			transaction_short_name[transaction], code, response_time, term_id);
 	pthread_mutex_unlock(&mutex_mix_log);
-	fflush(log_mix);
 }
 
 void *terminals_worker(void *data)

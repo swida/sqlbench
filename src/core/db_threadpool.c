@@ -44,7 +44,7 @@ int startup();
 
 /* Global Variables */
 int db_connections = 0;
-int db_conn_sleep = 1000; /* milliseconds */
+int db_conn_sleep = 200; /* milliseconds */
 struct db_worker_desc_t *db_worker_desc;
 pthread_t *db_worker_tids;
 int db_worker_started = 0;
@@ -52,7 +52,8 @@ int db_worker_started = 0;
 /* These should probably be handled differently. */
 extern int exiting;
 extern int no_thinktime;
-extern int start_time;
+extern time_t start_time;
+extern time_t stop_time;
 sem_t db_worker_count;
 
 static struct transaction_queue_node_t *db_get_transaction(
@@ -219,9 +220,18 @@ int db_threadpool_init()
         ts.tv_nsec = (long) (db_conn_sleep % 1000) * 1000000;
 
 		if (no_thinktime != 0) {
+			char tm_disp_str[64];
 			total_terms = (w_id_max - w_id_min + 1) * terminals_per_warehouse;
 			term_per_conn = (total_terms + db_connections - 1) / db_connections;
-			start_time = (int) time(NULL);
+			start_time = time(NULL);
+			stop_time = start_time + duration_rampup + duration;
+			format_time(tm_disp_str, sizeof(tm_disp_str), start_time);
+			printf("DB worker is starting to ramp up at time %s\n", tm_disp_str);
+			printf("DB worker will ramp up in %d seconds\n", duration_rampup);
+			format_time(tm_disp_str, sizeof(tm_disp_str), stop_time);
+			printf("will stop test at time %s\n", tm_disp_str);
+
+			log_rampup_start();
 		}
 
         for (i = 0; i < db_connections; i++) {
@@ -292,9 +302,19 @@ void db_threadpool_destroy()
 {
 	int count;
 	if (no_thinktime != 0) {
-		time_t stop_time = time(NULL) + duration + duration_rampup;
-		while (!exiting && time(NULL) < stop_time)
+		time_t rampup_time = start_time + duration_rampup;
+
+		time_t now = time(NULL);
+		while (!exiting && now < stop_time) {
+			if (now >= rampup_time) {
+				log_testing_start();
+				printf("steady status started...\n");
+				rampup_time = stop_time + 1;
+			}
+
 			sleep(1);
+			now = time(NULL);
+		}
 	}
 
 	printf("DB worker threads are exiting normally\n");

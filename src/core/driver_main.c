@@ -34,7 +34,7 @@ int parse_arguments(int argc, char *argv[]);
 
 static void sig_int_hander(int sig)
 {
-	fprintf(stderr, "Interrupt by user, exiting ...\n");
+	fprintf(stderr, "interrupt by user, exiting...\n");
 	exiting = 1;
 }
 
@@ -480,7 +480,7 @@ parse_dbc_type_done:
 			terminals_per_warehouse = atoi(optarg);
 			break;
 		case 22:
-			db_conn_sleep = client_conn_sleep = atoi(optarg);
+			db_conn_sleep = atoi(optarg);
 			break;
 		case 23:
 		{

@@ -120,6 +120,7 @@ int get_random(int max);
 int get_think_time(int mean_think_time);
 int init_common();
 int create_pid_file();
+void format_time(char *disp_str, int len, time_t t);
 
 extern char output_path[256];
 extern const char *c_last_syl[C_LAST_SYL_MAX];

@@ -84,7 +84,8 @@ int set_transaction_mix(int transaction, double mix);
 void start_drivers();
 void wait_drivers_finish();
 void destroy_drivers();
-
+void log_rampup_start();
+void log_testing_start();
 void log_transaction_mix(int transaction, char code, double response_time, unsigned int term_id);
 int start_db_threadpool(void);
 
