@@ -42,7 +42,6 @@ int stop_time = 0;
 int start_time = 0;
 int w_id_min = 0, w_id_max = 0;
 int terminals_per_warehouse = 0;
-int mode_altered = 0;
 unsigned int seed = -1;
 int client_conn_sleep = 1000; /* milliseconds */
 int duration_rampup = 0;
@@ -274,9 +273,8 @@ int start_driver()
 	int threads_start_time;
 	/* Just used to count the number of threads created. */
 	int count = 0;
-	int thread_count = mode_altered > 0 ? mode_altered :
-		(((w_id_max - w_id_min + 1) * terminals_per_warehouse + terminals_per_thread - 1)
-		 / terminals_per_thread);
+	int thread_count = ((w_id_max - w_id_min + 1) * terminals_per_warehouse +
+			    terminals_per_thread - 1) / terminals_per_thread;
 
 	ts.tv_sec = (time_t) (client_conn_sleep / 1000);
 	ts.tv_nsec = (long) (client_conn_sleep % 1000) * 1000000;
@@ -446,15 +444,6 @@ void *terminals_worker(void *data)
 
 		node = &term->node;
 		client_data = &node->client_data;
-
-		if (mode_altered > 0) {
-			/*
-			 * Determine w_id and d_id for the client per
-			 * transaction.
-			 */
-			w_id = w_id_min + get_random(w_id_max - w_id_min + 1);
-			d_id = get_random(table_cardinality.districts) + 1;
-		}
 
 		w_id = term->id % (w_id_max - w_id_min + 1) + w_id_min;
 		d_id = term->id / (w_id_max - w_id_min + 1) + 1;

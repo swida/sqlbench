@@ -22,7 +22,7 @@
 #include "logging.h"
 #include "transaction_data.h"
 #include "dbc.h"
-int mode_altered = 0;
+
 void
 usage(const char *progname)
 {

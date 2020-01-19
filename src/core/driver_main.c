@@ -122,8 +122,6 @@ int main(int argc, char *argv[])
 		printf("\n");
 		printf("--seed #\n");
 		printf("\trandom number seed\n");
-		printf("--altered #\n");
-		printf("\trun with a thread per user, and will start # threads\n");
 		printf("--sleep #\n");
 		printf("\tnumber of milliseconds to sleep between terminal creation, openning db connections\n");
 		printf("--sqlapi\n");
@@ -215,11 +213,6 @@ int main(int argc, char *argv[])
 		printf("Output directory of log files: %s\n",output_path);
 	} else {
 		printf("Output directory of log files: current directory\n");
-	}
-	if(mode_altered > 0)
-	{
-		printf("\n");
-		printf("altered mode enabled, will start %d threads\n", mode_altered);
 	}
 	/* Double database conections. */
 	printf("\n");
@@ -333,8 +326,7 @@ int parse_arguments(int argc, char *argv[])
 		{"tpw", required_argument, 0, 21},
 		{"sleep", required_argument, 0, 22},
 		{"seed",  required_argument, 0, 23},
-		{"altered", required_argument, 0, 24},
-		{"sqlapi", required_argument, 0, 25},
+		{"sqlapi", required_argument, 0, 24},
 		{0, 0, 0, 0}
 	};
 
@@ -501,9 +493,6 @@ parse_dbc_type_done:
 		}
 		break;
 		case 24:
-			mode_altered = atoi(optarg);
-			break;
-		case 25:
 			if (strcasecmp(optarg, "simple") == 0)
 				use_sqlapi_type = SQLAPI_SIMPLE;
 			else if (strcasecmp(optarg, "extended") == 0)

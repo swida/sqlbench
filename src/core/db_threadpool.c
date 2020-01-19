@@ -133,8 +133,7 @@ void *db_worker(void *data)
 		}
 
 		response_time = difftimeval(rt1, rt0);
-		log_transaction_mix(node->client_data.transaction, code, response_time,
-							mode_altered > 0 ? node->termworker_id : node->term_id);
+		log_transaction_mix(node->client_data.transaction, code, response_time, node->term_id);
 		enqueue_terminal(node->termworker_id, node->term_id);
 
 		/* Keep track of how many transactions this thread has done. */

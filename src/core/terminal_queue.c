@@ -116,17 +116,6 @@ struct termworker_context_t * init_termworker_context(int id, int thread_count)
 	else
 		tc->end_term = (id + 1) * terminals_per_thread;
 
-	/* initialize terminal array */
-	if (mode_altered > 0)
-	{
-		/*
-		 * This effectively allows one client to touch
-		 * the entire warehouse range.  The setting of
-		 * w_id and d_id is moot in this case.
-		 */
-		tc->start_term = 0;
-		tc->end_term = 1;
-	}
 	terminal_count = tc->end_term - tc->start_term;
 	tc->term_queue.queue = malloc(sizeof(tqueue_t) * terminal_count);
 	tc->term_queue.terminals = malloc(sizeof(struct terminal_t) * terminal_count);

@@ -93,7 +93,6 @@ extern int duration_rampup;
 extern int w_id_min, w_id_max;
 extern int terminals_per_warehouse;
 extern int terminals_per_thread;
-extern int mode_altered;
 extern unsigned int seed;
 extern int client_conn_sleep;
 

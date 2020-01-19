@@ -21,9 +21,6 @@ int generate_payment_data(int w_id, struct payment_t *data);
 int generate_stock_level_data(int w_id, int d_id, struct stock_level_t *data);
 int generate_integrity_data(int w_id, struct integrity_t *data);
 
-/* Does it make sense to include driver.h for this? */
-extern int mode_altered;
-
 /* This function generates data for all transactions except Stock-Level. */
 int generate_input_data(int type, void *data, int w_id)
 {
@@ -79,7 +76,7 @@ int generate_new_order_data(int w_id, struct new_order_t *data)
 	for (i = 0; i < data->o_ol_cnt; i++) {
 		data->order_line[i].ol_i_id = get_nurand(8191, 1, 100000);
 		if (table_cardinality.warehouses > 1) {
-			if (mode_altered > 0 || get_random(100) > 0) {
+			if (get_random(100) > 0) {
 				data->order_line[i].ol_supply_w_id = w_id;
 			} else {
 				data->order_line[i].ol_supply_w_id =
@@ -139,7 +136,7 @@ int generate_payment_data(int w_id, struct payment_t *data)
 		data->c_id = get_nurand(1023, 1, 3000);
 	}
 
-	if (mode_altered > 0 || get_random(100) < 85) {
+	if (get_random(100) < 85) {
 		data->c_w_id = w_id;
 		data->c_d_id = data->d_id;
 	} else {
