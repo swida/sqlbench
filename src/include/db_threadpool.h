@@ -8,9 +8,7 @@
  *
  * 31 june 2002
  */
-
-#include <_semaphore.h>
-
+#include <semaphore.h>
 extern sem_t db_worker_count;
 extern int db_connections;
 extern int db_conn_sleep;

@@ -1,4 +1,5 @@
 #include <string.h>
+#include <pthread.h>
 #include "terminal_queue.h"
 #include "driver.h"
 

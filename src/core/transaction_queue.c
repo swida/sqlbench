@@ -10,7 +10,8 @@
 #include <common.h>
 #include <logging.h>
 #include <transaction_queue.h>
-#include <_semaphore.h>
+#include <semaphore.h>
+#include <pthread.h>
 
 #ifdef DEBUG
 #include <unistd.h>

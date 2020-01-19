@@ -5,7 +5,6 @@ noinst_HEADERS = common.h \
 	driver.h \
 	input_data_generator.h \
 	logging.h \
-	_semaphore.h \
 	transaction_data.h \
 	transaction_queue.h \
 	terminal_queue.h

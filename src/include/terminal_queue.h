@@ -1,6 +1,6 @@
 #ifndef TERMINAL_QUEUE_H
 #define TERMINAL_QUEUE_H
-#include "_semaphore.h"
+#include <semaphore.h>
 #include "transaction_queue.h"
 
 typedef unsigned short tqueue_t;

@@ -3,7 +3,7 @@ bin_PROGRAMS = datagen sqlbench transaction_test
 
 AM_CPPFLAGS = -I$(top_srcdir)/src/include
 AM_LDFLAGS = -pthread
-libcore_a_SOURCES = common.c logging.c transaction_data.c _semaphore.c dbc_manager.c db.c \
+libcore_a_SOURCES = common.c logging.c transaction_data.c dbc_manager.c db.c \
 	input_data_generator.c
 
 LDADD = libcore.a ../simple/libsimplesql.a ../extended/libextended.a
