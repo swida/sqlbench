@@ -509,7 +509,7 @@ pgsql_dbc_init()
 	struct dbc_info_t *pgsql_info = make_dbc_info(
 		"postgresql",
 		"for postgresql: --dbname=<dbname> --host=<host> --port=<port> --user=<user> --password=<pass>");
-	pgsql_info->is_forupdate_supported = 0;
+	pgsql_info->is_forupdate_supported = 1;
 
 	pgsql_info->dbc_sql_operation = &pgsql_sql_operation;
 	pgsql_info->dbc_storeproc_operation = &pgsql_storeproc_operation;

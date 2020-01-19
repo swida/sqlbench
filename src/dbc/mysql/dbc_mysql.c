@@ -520,7 +520,7 @@ mysql_dbc_init()
 	struct dbc_info_t *mysql_info = make_dbc_info(
 		"mysql",
 		"for mysql: --dbname=<dbname> --host=<host> --port=<port> --user=<user> --password=<pass> --socket=<socket>");
-	mysql_info->is_forupdate_supported = 0;
+	mysql_info->is_forupdate_supported = 1;
 
 	mysql_info->dbc_sql_operation = &mysql_sql_operation;
 	mysql_info->dbc_storeproc_operation = &mysql_storeproc_operation;

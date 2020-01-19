@@ -92,7 +92,7 @@ BEGIN
 	  AND d_id = tmp_d_id
 	FOR UPDATE;
 	IF NOT FOUND THEN
-		RAISE DEBUG ''NEW_ORDER_3 failed'';
+		RAISE DEBUG ''NEW_ORDER_2 failed'';
 		RETURN 11;
 	END IF;
 	UPDATE district

@@ -468,7 +468,7 @@ kingbase_dbc_init()
 	struct dbc_info_t *kingbase_info = make_dbc_info(
 		"kingbase",
 		"for kingbase: --dbname=<dbname> --host=<host> --port=<port> --user=<user>");
-	kingbase_info->is_forupdate_supported = 0;
+	kingbase_info->is_forupdate_supported = 1;
 
 	kingbase_info->dbc_sql_operation = &kingbase_sql_operation;
 	kingbase_info->dbc_storeproc_operation = NULL;

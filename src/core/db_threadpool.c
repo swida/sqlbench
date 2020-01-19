@@ -213,7 +213,7 @@ int db_threadpool_init()
         }
 
 		db_worker_desc = (struct db_worker_desc_t *) malloc(sizeof(struct db_worker_desc_t) * db_connections);
-		db_worker_tids = (pthread_t *) malloc(sizeof(pthread_t) + db_connections);
+		db_worker_tids = (pthread_t *) malloc(sizeof(pthread_t) * db_connections);
 
         ts.tv_sec = (time_t) db_conn_sleep / 1000;
         ts.tv_nsec = (long) (db_conn_sleep % 1000) * 1000000;
