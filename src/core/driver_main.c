@@ -52,25 +52,25 @@ int main(int argc, char *argv[])
 			argv[0]);
 		printf("\n");
 		printf("-t <dbms>\n");
-		printf("\tavailable:%s\n", dbc_manager_get_dbcnames());
+		printf("\t specify database to test (mandatory), available:%s\n", dbc_manager_get_dbcnames());
 		printf("%s", dbc_manager_get_dbcusages());
 		printf("-c #\n");
-		printf("\tnumber of database connections\n");
+		printf("\tnumber of database connections, mandatory\n");
 		printf("-w #\n");
-		printf("\twarehouse cardinality, default 1\n");
+		printf("\twarehouse cardinality, default %d\n", table_cardinality.warehouses);
 		printf("-l #\n");
-		printf("\tthe duration of the run in seconds\n");
+		printf("\tthe duration of the run in seconds, default: %d min\n", duration / 60);
 		printf("\n");
 		printf("-r #\n");
-		printf("\tthe duration of ramp up in seconds\n");
+		printf("\tthe duration of ramp up in seconds, default ramp up until all threads started\n");
 		printf("-s #\n");
-		printf("\tlower warehouse id, default 1\n");
+		printf("\tlower warehouse id, default %d\n", w_id_min);
 		printf("-e #\n");
-		printf("\tupper warehouse id, default <w>\n");
+		printf("\tupper warehouse id, set according to warehouse cardinality (-w) by default\n");
 		printf("-o p\n");
 		printf("\toutput directory of log files, default current directory\n");
 		printf("-z\n");
-		printf("\tperform database integrity check\n");
+		printf("\tperform database integrity check, disabled by default\n");
 		printf("\n");
 		printf("--customer #\n");
 		printf("\tcustomer cardinality, default %d\n", CUSTOMER_CARDINALITY);
@@ -121,19 +121,16 @@ int main(int argc, char *argv[])
 		printf("\tstock-level thinking time, default %d ms\n",
 				THINK_TIME_STOCK_LEVEL);
 		printf("--no-thinktime\n");
-		printf("\tno think time and keying time to every transaction\n");
+		printf("\tno think time and keying time to every transaction, disabled by default\n");
 		printf("\n");
 		printf("--tpw #\n");
 		printf("\tterminals started per warehouse, default 10\n");
-
 		printf("\n");
-		printf("--seed #\n");
-		printf("\trandom number seed\n");
 		printf("--sleep #\n");
-		printf("\tnumber of milliseconds to sleep between terminal creation, openning db connections\n");
+		printf("\tnumber of milliseconds to sleep between database connections, default %d ms\n", db_conn_sleep);
 		printf("--sqlapi\n");
-		printf("\trun test using sql interface, available:\n");
-		printf("\tsimple      default, just send sql statement to database\n");
+		printf("\trun test using database interfaces(default: simple), available:\n");
+		printf("\tsimple      just send sql statement to database\n");
 		printf("\textended    use extended (prepare/bind/execute) protocol, better than simple\n");
 		printf("\tstoreproc   use store procedure\n");
 		return 1;
@@ -166,12 +163,10 @@ int main(int argc, char *argv[])
 	create_pid_file();
 
 	if (db_connections == 0) {
-		printf("-c not used\n");
+		printf("number of database connections must be given (-c)\n");
 		return 1;
 	}
 
-	if(w_id_min == 0)
-		w_id_min = 1;
 	if(w_id_max == 0)
 		w_id_max = table_cardinality.warehouses;
 
@@ -329,8 +324,7 @@ int parse_arguments(int argc, char *argv[])
 		{"no-thinktime", no_argument, 0, 20},
 		{"tpw", required_argument, 0, 21},
 		{"sleep", required_argument, 0, 22},
-		{"seed",  required_argument, 0, 23},
-		{"sqlapi", required_argument, 0, 24},
+		{"sqlapi", required_argument, 0, 23},
 		{0, 0, 0, 0}
 	};
 
@@ -483,20 +477,6 @@ parse_dbc_type_done:
 			db_conn_sleep = atoi(optarg);
 			break;
 		case 23:
-		{
-			int count;
-			int length;
-
-			seed = 0;
-			length = strlen(optarg);
-
-			for (count = 0; count < length; count++) {
-				seed += (optarg[count] - '0') *
-						(unsigned int) pow(10, length - (count + 1));
-			}
-		}
-		break;
-		case 24:
 			if (strcasecmp(optarg, "simple") == 0)
 				use_sqlapi_type = SQLAPI_SIMPLE;
 			else if (strcasecmp(optarg, "extended") == 0)
