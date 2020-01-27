@@ -38,6 +38,94 @@ static void sig_int_hander(int sig)
 	exiting = 1;
 }
 
+static void usage(const char *progname)
+{
+	printf("usage: %s -t <dbms> -c # -w # -l # [-r #] [-s #] [-e #] [-o p] [-z]", progname);
+	printf("\n");
+	printf("-t <dbms>\n");
+	printf("\t specify database to test (mandatory), available:%s\n", dbc_manager_get_dbcnames());
+	printf("%s", dbc_manager_get_dbcusages());
+	printf("-c #\n");
+	printf("\tnumber of database connections, mandatory\n");
+	printf("-w #\n");
+	printf("\twarehouse cardinality, default %d\n", table_cardinality.warehouses);
+	printf("-l #\n");
+	printf("\tthe duration of the run in seconds, default: %d min\n", duration / 60);
+	printf("\n");
+	printf("-r #\n");
+	printf("\tthe duration of ramp up in seconds, default ramp up until all threads started\n");
+	printf("-s #\n");
+	printf("\tlower warehouse id, default %d\n", w_id_min);
+	printf("-e #\n");
+	printf("\tupper warehouse id, set according to warehouse cardinality (-w) by default\n");
+	printf("-o p\n");
+	printf("\toutput directory of log files, default current directory\n");
+	printf("-z\n");
+	printf("\tperform database integrity check, disabled by default\n");
+	printf("\n");
+	printf("--customer #\n");
+	printf("\tcustomer cardinality, default %d\n", CUSTOMER_CARDINALITY);
+	printf("--item #\n");
+	printf("\titem cardinality, default %d\n", ITEM_CARDINALITY);
+	printf("--order #\n");
+	printf("\torder cardinality, default %d\n", ORDER_CARDINALITY);
+	printf("--new-order #\n");
+	printf("\tnew-order cardinality, default %d\n", NEW_ORDER_CARDINALITY);
+	printf("\n");
+	printf("--mixp %%\n");
+	printf("\tmix percentage of Payment transaction, default %0.2f\n",
+		   MIX_PAYMENT);
+	printf("--mixo %%\n");
+	printf("\tmix percentage of Order-Status transaction, default %0.2f\n",
+		   MIX_ORDER_STATUS);
+	printf("--mixd %%\n");
+	printf("\tmix percentage of Delivery transaction, default %0.2f\n",
+		   MIX_DELIVERY);
+	printf("--mixs %%\n");
+	printf("\tmix percentage of Stock-Level transaction, default %0.2f\n",
+		   MIX_STOCK_LEVEL);
+	printf("\n");
+	printf("--ktd #\n");
+	printf("\tdelivery keying time, default %d s\n", KEY_TIME_DELIVERY);
+	printf("--ktn #\n");
+	printf("\tnew-order keying time, default %d s\n", KEY_TIME_NEW_ORDER);
+	printf("--kto #\n");
+	printf("\torder-status keying time, default %d s\n",
+		   KEY_TIME_ORDER_STATUS);
+	printf("--ktp #\n");
+	printf("\tpayment keying time, default %d s\n", KEY_TIME_PAYMENT);
+	printf("--kts #\n");
+	printf("\tstock-level keying time, default %d s\n",
+		   KEY_TIME_STOCK_LEVEL);
+	printf("--ttd #\n");
+	printf("\tdelivery thinking time, default %d ms\n",
+		   THINK_TIME_DELIVERY);
+	printf("--ttn #\n");
+	printf("\tnew-order thinking time, default %d ms\n",
+		   THINK_TIME_NEW_ORDER);
+	printf("--tto #\n");
+	printf("\torder-status thinking time, default %d ms\n",
+		   THINK_TIME_ORDER_STATUS);
+	printf("--ttp #\n");
+	printf("\tpayment thinking time, default %d ms\n", THINK_TIME_PAYMENT);
+	printf("--tts #\n");
+	printf("\tstock-level thinking time, default %d ms\n",
+		   THINK_TIME_STOCK_LEVEL);
+	printf("--no-thinktime\n");
+	printf("\tno think time and keying time to every transaction, disabled by default\n");
+	printf("\n");
+	printf("--tpw #\n");
+	printf("\tterminals started per warehouse, default 10\n");
+	printf("\n");
+	printf("--sleep #\n");
+	printf("\tnumber of milliseconds to sleep between database connections, default %d ms\n", db_conn_sleep);
+	printf("--sqlapi\n");
+	printf("\trun test using database interfaces(default: simple), available:\n");
+	printf("\tsimple      just send sql statement to database\n");
+	printf("\textended    use extended (prepare/bind/execute) protocol, better than simple\n");
+	printf("\tstoreproc   use store procedure\n");
+}
+
 int main(int argc, char *argv[])
 {
 	struct stat st;
@@ -48,96 +136,12 @@ int main(int argc, char *argv[])
 	init_driver();
 
 	if (parse_arguments(argc, argv) != OK) {
-		printf("usage: %s -t <dbms> -c # -w # -l # [-r #] [-s #] [-e #] [-o p] [-z]",
-			argv[0]);
-		printf("\n");
-		printf("-t <dbms>\n");
-		printf("\t specify database to test (mandatory), available:%s\n", dbc_manager_get_dbcnames());
-		printf("%s", dbc_manager_get_dbcusages());
-		printf("-c #\n");
-		printf("\tnumber of database connections, mandatory\n");
-		printf("-w #\n");
-		printf("\twarehouse cardinality, default %d\n", table_cardinality.warehouses);
-		printf("-l #\n");
-		printf("\tthe duration of the run in seconds, default: %d min\n", duration / 60);
-		printf("\n");
-		printf("-r #\n");
-		printf("\tthe duration of ramp up in seconds, default ramp up until all threads started\n");
-		printf("-s #\n");
-		printf("\tlower warehouse id, default %d\n", w_id_min);
-		printf("-e #\n");
-		printf("\tupper warehouse id, set according to warehouse cardinality (-w) by default\n");
-		printf("-o p\n");
-		printf("\toutput directory of log files, default current directory\n");
-		printf("-z\n");
-		printf("\tperform database integrity check, disabled by default\n");
-		printf("\n");
-		printf("--customer #\n");
-		printf("\tcustomer cardinality, default %d\n", CUSTOMER_CARDINALITY);
-		printf("--item #\n");
-		printf("\titem cardinality, default %d\n", ITEM_CARDINALITY);
-		printf("--order #\n");
-		printf("\torder cardinality, default %d\n", ORDER_CARDINALITY);
-		printf("--new-order #\n");
-		printf("\tnew-order cardinality, default %d\n", NEW_ORDER_CARDINALITY);
-		printf("\n");
-		printf("--mixp %%\n");
-		printf("\tmix percentage of Payment transaction, default %0.2f\n",
-				MIX_PAYMENT);
-		printf("--mixo %%\n");
-		printf("\tmix percentage of Order-Status transaction, default %0.2f\n",
-				MIX_ORDER_STATUS);
-		printf("--mixd %%\n");
-		printf("\tmix percentage of Delivery transaction, default %0.2f\n",
-				MIX_DELIVERY);
-		printf("--mixs %%\n");
-		printf("\tmix percentage of Stock-Level transaction, default %0.2f\n",
-				MIX_STOCK_LEVEL);
-		printf("\n");
-		printf("--ktd #\n");
-		printf("\tdelivery keying time, default %d s\n", KEY_TIME_DELIVERY);
-		printf("--ktn #\n");
-		printf("\tnew-order keying time, default %d s\n", KEY_TIME_NEW_ORDER);
-		printf("--kto #\n");
-		printf("\torder-status keying time, default %d s\n",
-				KEY_TIME_ORDER_STATUS);
-		printf("--ktp #\n");
-		printf("\tpayment keying time, default %d s\n", KEY_TIME_PAYMENT);
-		printf("--kts #\n");
-		printf("\tstock-level keying time, default %d s\n",
-				KEY_TIME_STOCK_LEVEL);
-		printf("--ttd #\n");
-		printf("\tdelivery thinking time, default %d ms\n",
-				THINK_TIME_DELIVERY);
-		printf("--ttn #\n");
-		printf("\tnew-order thinking time, default %d ms\n",
-				THINK_TIME_NEW_ORDER);
-		printf("--tto #\n");
-		printf("\torder-status thinking time, default %d ms\n",
-				THINK_TIME_ORDER_STATUS);
-		printf("--ttp #\n");
-		printf("\tpayment thinking time, default %d ms\n", THINK_TIME_PAYMENT);
-		printf("--tts #\n");
-		printf("\tstock-level thinking time, default %d ms\n",
-				THINK_TIME_STOCK_LEVEL);
-		printf("--no-thinktime\n");
-		printf("\tno think time and keying time to every transaction, disabled by default\n");
-		printf("\n");
-		printf("--tpw #\n");
-		printf("\tterminals started per warehouse, default 10\n");
-		printf("\n");
-		printf("--sleep #\n");
-		printf("\tnumber of milliseconds to sleep between database connections, default %d ms\n", db_conn_sleep);
-		printf("--sqlapi\n");
-		printf("\trun test using database interfaces(default: simple), available:\n");
-		printf("\tsimple      just send sql statement to database\n");
-		printf("\textended    use extended (prepare/bind/execute) protocol, better than simple\n");
-		printf("\tstoreproc   use store procedure\n");
+		usage(argv[0]);
 		return 1;
 	}
 
 	if(init_logging() != OK || init_driver_logging() != OK) {
-		printf("cannot init driver\n");
+		printf("cannot initialize driver logging\n");
 		return 1;
 	};
 
@@ -158,9 +162,8 @@ int main(int argc, char *argv[])
 		}
 		printf("use extended sql interface\n");
 	}
-	set_sqlapi_operation(use_sqlapi_type);
 
-	create_pid_file();
+	set_sqlapi_operation(use_sqlapi_type);
 
 	if (db_connections == 0) {
 		printf("number of database connections must be given (-c)\n");
@@ -177,6 +180,11 @@ int main(int argc, char *argv[])
 	}
 	if (w_id_max > table_cardinality.warehouses) {
 		printf("upper warehouse id cannot be larger than warehouse cardinality\n");
+		return 1;
+	}
+
+	if (no_thinktime && db_connections > (w_id_max - w_id_min + 1) * terminals_per_warehouse) {
+		printf("number of database connections (-c) must be less than number of terminals.\n");
 		return 1;
 	}
 

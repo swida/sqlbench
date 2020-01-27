@@ -54,25 +54,6 @@ extern int exiting;
 pthread_t *driver_tids;
 int started_driver_count = 0;
 
-int create_pid_file()
-{
-	FILE * fpid;
-	char pid_filename[1024];
-
-	sprintf(pid_filename, "%s%s", output_path, DRIVER_PID_FILENAME);
-
-	fpid = fopen(pid_filename,"w");
-	if (!fpid) {
-		printf("cann't create pid file: %s\n", pid_filename);
-		return ERROR;
-	}
-
-	fprintf(fpid,"%d", (unsigned int) getpid());
-	fclose(fpid);
-
-	return OK;
-}
-
 int init_driver()
 {
 	terminals_per_warehouse = table_cardinality.districts;
