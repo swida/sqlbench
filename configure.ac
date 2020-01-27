@@ -82,30 +82,6 @@ then
 	AC_DEFINE(ENABLE_MYSQL, 1, [enable mysql support.])
 fi
 
-kingbase=no
-AC_ARG_WITH(kingbase,
-    [  --with-kingbase=DIR     site header and library files for Kingbase in DIR],
-    [
-        case "$withval" in
-        y | ye | yes)
-            AC_MSG_ERROR([*** You must supply an argument to the --with-kingbase option.])
-          ;;
-        esac
-	kingbase=yes
-        KINGBASE_INCLUDE_DIR="${withval}/include"
-        KINGBASE_LIB_DIR="${withval}/lib"
-        KINGBASE_LIBS="-L${KINGBASE_LIB_DIR} -lkci"
-	AC_SUBST(KINGBASE_INCLUDE_DIR)
-	AC_SUBST(KINGBASE_LIB_DIR)
-	AC_SUBST(KINGBASE_LIBS)
-    ])
-
-AM_CONDITIONAL([ENABLE_KINGBASE], [test "$kingbase" = yes])
-if test "$kingbase" = yes
-then
-	AC_DEFINE(ENABLE_KINGBASE, 1, [enable kingbase support.])
-fi
-
 odbc=no
 AC_ARG_WITH(odbc,
     [  --with-odbc=yes     enable UnixODBC support],
@@ -134,9 +110,9 @@ then
 	AC_DEFINE(ENABLE_ODBC, 1, [enable odbc support.])
 fi
 
-if test "$postgresql" != yes -a "$kingbase" != yes -a "$mysql" != yes -a "$odbc" != yes
+if test "$postgresql" != yes -a "$mysql" != yes -a "$odbc" != yes
 then
-	AC_MSG_ERROR([*** you must select database client interface using --with-PACKAGE options, current supported: postgresql, mysql, kingbase and odbc. ])
+	AC_MSG_ERROR([*** you must select database client interface using --with-PACKAGE options, current supported: postgresql, mysql and odbc. ])
 fi
 # Checks for libraries.
 AC_CHECK_LIB([m], [pow])
@@ -185,15 +161,6 @@ then
 		src/storeproc/mysql/Makefile
 		src/storeproc/mysql/plsql/Makefile
 		src/scripts/mysql/Makefile
-	])
-fi
-
-if test "$kingbase" = yes
-then
-	AC_CONFIG_FILES([
-		src/dbc/kingbase/Makefile
-		src/storeproc/kingbase/Makefile
-		src/storeproc/kingbase/plsql/Makefile
 	])
 fi
 

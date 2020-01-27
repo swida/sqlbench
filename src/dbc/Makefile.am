@@ -8,10 +8,6 @@ if ENABLE_MYSQL
 SUBDIRS += mysql
 endif
 
-if ENABLE_KINGBASE
-SUBDIRS += kingbase
-endif
-
 if ENABLE_ODBC
 SUBDIRS += odbc
 endif

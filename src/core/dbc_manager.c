@@ -6,9 +6,6 @@
 #ifdef ENABLE_POSTGRESQL
 extern int pgsql_dbc_init();
 #endif
-#ifdef ENABLE_KINGBASE
-extern int kingbase_dbc_init();
-#endif
 #ifdef ENABLE_MYSQL
 extern int mysql_dbc_init();
 #endif
@@ -19,9 +16,6 @@ struct dbc_construct_t dbc_constructs[] =
 {
 #ifdef ENABLE_POSTGRESQL
 	{pgsql_dbc_init},
-#endif
-#ifdef ENABLE_KINGBASE
-	{kingbase_dbc_init},
 #endif
 #ifdef ENABLE_MYSQL
 	{mysql_dbc_init},
