@@ -22,5 +22,13 @@ struct sqlapi_operation_t extended_sqlapi_operation =
 		extended_execute_payment,
 		extended_execute_stock_level,
 		extended_execute_integrity
+	},
+	{
+		extended_destroy_delivery,
+		extended_destroy_new_order,
+		extended_destroy_order_status,
+		extended_destroy_payment,
+		extended_destroy_stock_level,
+		NULL
 	}
 };

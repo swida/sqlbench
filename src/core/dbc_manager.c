@@ -345,5 +345,6 @@ struct sqlapi_operation_t storeproc_sqlapi_operation =
 		dbc_execsp_payment,
 		dbc_execsp_stock_level,
 		dbc_execsp_integrity
-	}
+	},
+	{NULL}
 };

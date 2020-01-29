@@ -61,6 +61,15 @@ extended_execute_payment(struct db_context_t *dbc, union transaction_data_t *dat
 	return OK;
 }
 
+void
+extended_destroy_payment(struct db_context_t *dbc)
+{
+	struct extended_payment_data *etd = dbc->transaction_data[PAYMENT];
+
+	dbt2_free_params(etd->params, 6);
+	free(etd);
+}
+
 static int
 payment(struct db_context_t *dbc, struct payment_t *data, char ** vals, int  nvals)
 {

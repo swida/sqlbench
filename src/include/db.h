@@ -41,12 +41,13 @@ struct sql_result_t
 typedef int (*trx_initializer_t) (db_context_t *dbc);
 typedef int (*trx_executor_t) (
 	db_context_t *dbc, union transaction_data_t *data);
-
+typedef void (*trx_destroy_t) (db_context_t *dbc);
 struct sqlapi_operation_t
 {
 	/* Initialization functions for each transaction*/
 	trx_initializer_t trx_initialize[N_TRANSACTIONS];
 	trx_executor_t trx_execute[N_TRANSACTIONS];
+	trx_destroy_t trx_destroy[N_TRANSACTIONS];
 };
 
 extern int connect_to_db(db_context_t *dbc);
@@ -58,6 +59,8 @@ int disconnect_from_db(db_context_t *dbc);
 int initialize_transactions(db_context_t *dbc);
 int process_transaction(
 	int transaction, db_context_t *dbc, union transaction_data_t *odbct);
+void destroy_transactions(db_context_t *dbc);
+
 void set_sqlapi_operation(enum sqlapi_type sa_type);
 
 #endif /* _DB_H_ */

@@ -18,6 +18,7 @@
 void dbt2_escape_str(char *orig_str, char *esc_str);
 int dbt2_init_values(char ** values, int max_values);
 int dbt2_init_params(char ** values, int max_values, int max_length);
+int dbt2_free_params(char ** values, int max_values);
 int dbt2_free_values(char ** values, int max_values);
 #define N_DELIVERY_1 "DELIVERY_1"
 #define DELIVERY_1 \

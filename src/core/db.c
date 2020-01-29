@@ -130,3 +130,13 @@ int process_transaction(int transaction, db_context_t *dbc,
 
 	return status;
 }
+
+void
+destroy_transactions(db_context_t *dbc)
+{
+	for(int i = 0; i < N_TRANSACTIONS; i++) {
+		trx_destroy_t trx_destroy = sbo->trx_destroy[i];
+		if (trx_destroy)
+			trx_destroy(dbc);
+	}
+}

@@ -54,6 +54,15 @@ int extended_execute_order_status(db_context_t *dbc, union transaction_data_t *d
 	return OK;
 }
 
+void
+extended_destroy_order_status(db_context_t *dbc)
+{
+	struct extended_order_status_data *etd = dbc->transaction_data[ORDER_STATUS];
+
+	dbt2_free_params(etd->params, 3);
+	free(etd);
+}
+
 
 static int
 order_status(db_context_t *dbc, struct order_status_t *data, char ** vals, int nvals)

@@ -38,7 +38,8 @@ extended_initialize_delivery(db_context_t *dbc)
 	return OK;
 }
 
-int extended_execute_delivery(db_context_t *dbc, union transaction_data_t *data)
+int
+extended_execute_delivery(db_context_t *dbc, union transaction_data_t *data)
 {
 	int nvals=3;
 	char *vals[3];
@@ -56,6 +57,15 @@ int extended_execute_delivery(db_context_t *dbc, union transaction_data_t *data)
 		return ERROR;
 	}
 	return OK;
+}
+
+void
+extended_destroy_delivery(db_context_t *dbc)
+{
+	struct extended_delivery_data *eda = dbc->transaction_data[DELIVERY];
+
+	dbt2_free_params(eda->params, 4);
+	free(eda);
 }
 
 static int

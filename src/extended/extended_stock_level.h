@@ -18,5 +18,6 @@
 
 int extended_initialize_stock_level(struct db_context_t *dbc);
 int extended_execute_stock_level(struct db_context_t *dbc, union transaction_data_t *data);
+void extended_destroy_stock_level(db_context_t *dbc);
 
 #endif /* _EXTENDED_STOCK_LEVEL_H_ */

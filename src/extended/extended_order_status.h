@@ -18,5 +18,6 @@
 
 int extended_initialize_order_status(db_context_t *dbc);
 int extended_execute_order_status(db_context_t *dbc, union transaction_data_t *data);
+void extended_destroy_order_status(db_context_t *dbc);
 
 #endif /* _SIMPLE_ORDER_STATUS_H_ */

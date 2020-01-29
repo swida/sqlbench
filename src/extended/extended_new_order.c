@@ -83,6 +83,19 @@ extended_execute_new_order(db_context_t *dbc, union transaction_data_t *data)
 	return OK;
 }
 
+void
+extended_destroy_new_order(db_context_t *dbc)
+{
+	struct extended_new_order_data *etd = dbc->transaction_data[NEW_ORDER];
+
+	dbt2_free_params(etd->params, 8);
+
+	for(int i = 0; i < sizeof(s_dist) / sizeof(s_dist[0]); i++)
+		free(etd->stmt8[i]);
+
+	free(etd);
+}
+
 static int
 new_order(db_context_t *dbc, struct new_order_t *data, char ** vals, int nvals)
 {

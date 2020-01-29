@@ -180,6 +180,7 @@ void *db_worker(void *data)
 			 * back, and try processing the next transaction.
 			 */
 			if(need_reconnect_to_db(dbc)) {
+				destroy_transactions(dbc);
 				disconnect_from_db(dbc);
 				if (reconnect_db)
 					goto conn_db;
@@ -206,6 +207,7 @@ void *db_worker(void *data)
 			enqueue_terminal(node->termworker_id, node->term_id);
 	}
 
+	destroy_transactions(dbc);
 	/* Disconnect from the database. */
 	disconnect_from_db(dbc);
 

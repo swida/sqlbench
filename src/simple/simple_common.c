@@ -28,7 +28,9 @@ struct sqlapi_operation_t simple_sqlapi_operation =
 		execute_payment,
 		execute_stock_level,
 		execute_integrity
-	}
+	},
+	{NULL}
+
 };
 
 void dbt2_escape_str(char *orig_str, char *esc_str)
@@ -56,17 +58,24 @@ int dbt2_init_values(char ** values, int max_values)
 	return 1;
 }
 
-int dbt2_init_params(char ** values, int max_values, int max_length)
+int dbt2_init_params(char **values, int max_values, int max_length)
 {
 	int i;
 
 	for (i=0; i<max_values; i++) {
-		values[i]= malloc(max_length);
+		values[i] = malloc(max_length);
 	}
+
 	return 1;
 }
 
-int dbt2_free_values(char ** values, int max_values)
+void dbt2_free_params(char **values, int num_val)
+{
+	for(int i = 0; i < num_val; i++)
+		free(values[i]);
+}
+
+int dbt2_free_values(char **values, int max_values)
 {
 	int i;
 
@@ -76,5 +85,6 @@ int dbt2_free_values(char ** values, int max_values)
 			values[i]= NULL;
 		}
 	}
+
 	return 1;
 }

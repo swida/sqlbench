@@ -18,5 +18,6 @@
 
 int extended_initialize_delivery(db_context_t *dbc);
 int extended_execute_delivery(db_context_t *dbc, union transaction_data_t *data);
+void extended_destroy_delivery(db_context_t *dbc);
 
 #endif /* _EXTENDED_DELIVERY_H_ */

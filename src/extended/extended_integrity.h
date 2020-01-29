@@ -18,5 +18,6 @@
 
 int extended_initialize_integrity(db_context_t *dbc);
 int extended_execute_integrity(db_context_t *dbc, union transaction_data_t *data);
+void extended_destroy_integrity(db_context_t *dbc);
 
 #endif /* _EXTENDED_INTEGRITY_H_ */

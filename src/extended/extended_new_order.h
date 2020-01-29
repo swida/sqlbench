@@ -18,5 +18,6 @@
 
 int extended_initialize_new_order(db_context_t *dbc);
 int extended_execute_new_order(db_context_t *dbc, union transaction_data_t *data);
+void extended_destroy_new_order(db_context_t *dbc);
 
 #endif /* _SIMPLE_NEW_ORDER_H_ */

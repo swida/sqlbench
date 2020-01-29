@@ -33,6 +33,15 @@ extended_initialize_stock_level(struct db_context_t *dbc)
 	return OK;
 }
 
+void
+extended_destroy_stock_level(db_context_t *dbc)
+{
+	struct extended_stock_level_data *etd = dbc->transaction_data[STOCK_LEVEL];
+
+	dbt2_free_params(etd->params, 5);
+	free(etd);
+}
+
 int
 extended_execute_stock_level(struct db_context_t *dbc, union transaction_data_t *data)
 {
