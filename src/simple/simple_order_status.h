@@ -16,7 +16,6 @@
 #include <transaction_data.h>
 #include <simple_common.h>
 
-int execute_order_status(struct db_context_t *dbc, struct order_status_t *data);
-int order_status(struct db_context_t *dbc, struct order_status_t *data, char ** vals, int  nvals);
+int execute_order_status(struct db_context_t *dbc, union transaction_data_t *data);
 
 #endif /* _SIMPLE_ORDER_STATUS_H_ */

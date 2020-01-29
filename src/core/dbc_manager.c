@@ -260,52 +260,52 @@ dbc_sql_getvalue(db_context_t *dbc, struct sql_result_t * sql_result, int field)
 }
 
 /* storeproc */
-int dbc_execsp_integrity (db_context_t *dbc, struct integrity_t *data)
+int dbc_execsp_integrity (db_context_t *dbc, union transaction_data_t *data)
 {
 	assert(_dbc_info);
 	struct dbc_storeproc_operation_t *sop = _dbc_info->dbc_storeproc_operation;
 	assert(sop);
-	return (*(sop->exec_sp_integrity))(dbc, data);
+	return (*(sop->exec_sp_integrity))(dbc, &data->integrity);
 }
 
-int dbc_execsp_delivery (db_context_t *dbc, struct delivery_t *data)
+int dbc_execsp_delivery (db_context_t *dbc, union transaction_data_t *data)
 {
 	assert(_dbc_info);
 	struct dbc_storeproc_operation_t *sop = _dbc_info->dbc_storeproc_operation;
 	assert(sop);
-	return (*(sop->exec_sp_delivery))(dbc, data);
+	return (*(sop->exec_sp_delivery))(dbc, &data->delivery);
 }
 
-int dbc_execsp_new_order (db_context_t *dbc, struct new_order_t *data)
+int dbc_execsp_new_order (db_context_t *dbc, union transaction_data_t *data)
 {
 	assert(_dbc_info);
 	struct dbc_storeproc_operation_t *sop = _dbc_info->dbc_storeproc_operation;
 	assert(sop);
-	return (*(sop->exec_sp_new_order))(dbc, data);
+	return (*(sop->exec_sp_new_order))(dbc, &data->new_order);
 }
 
-int dbc_execsp_order_status (db_context_t *dbc, struct order_status_t *data)
+int dbc_execsp_order_status (db_context_t *dbc, union transaction_data_t *data)
 {
 	assert(_dbc_info);
 	struct dbc_storeproc_operation_t *sop = _dbc_info->dbc_storeproc_operation;
 	assert(sop);
-	return (*(sop->exec_sp_order_status))(dbc, data);
+	return (*(sop->exec_sp_order_status))(dbc, &data->order_status);
 }
 
-int dbc_execsp_payment (db_context_t *dbc, struct payment_t *data)
+int dbc_execsp_payment (db_context_t *dbc, union transaction_data_t *data)
 {
 	assert(_dbc_info);
 	struct dbc_storeproc_operation_t *sop = _dbc_info->dbc_storeproc_operation;
 	assert(sop);
-	return (*(sop->exec_sp_payment))(dbc, data);
+	return (*(sop->exec_sp_payment))(dbc, &data->payment);
 }
 
-int dbc_execsp_stock_level (db_context_t *dbc, struct stock_level_t *data)
+int dbc_execsp_stock_level (db_context_t *dbc, union transaction_data_t *data)
 {
 	assert(_dbc_info);
 	struct dbc_storeproc_operation_t *sop = _dbc_info->dbc_storeproc_operation;
 	assert(sop);
-	return (*(sop->exec_sp_stock_level))(dbc, data);
+	return (*(sop->exec_sp_stock_level))(dbc, &data->stock_level);
 }
 
 struct loader_stream_t *dbc_open_loader_stream(db_context_t *dbc,
@@ -338,10 +338,12 @@ void dbc_close_loader_stream(struct loader_stream_t *stream)
 struct sqlapi_operation_t storeproc_sqlapi_operation =
 {
 	{NULL},
-	dbc_execsp_integrity,
-	dbc_execsp_delivery,
-	dbc_execsp_new_order,
-	dbc_execsp_order_status,
-	dbc_execsp_payment,
-	dbc_execsp_stock_level
+	{
+		dbc_execsp_delivery,
+		dbc_execsp_new_order,
+		dbc_execsp_order_status,
+		dbc_execsp_payment,
+		dbc_execsp_stock_level,
+		dbc_execsp_integrity
+	}
 };

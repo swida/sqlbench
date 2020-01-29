@@ -16,7 +16,6 @@
 #include <transaction_data.h>
 #include <simple_common.h>
 
-int execute_payment(struct db_context_t *dbc, struct payment_t *data);
-int  payment(struct db_context_t *dbc, struct payment_t *data, char ** vals, int  nvals);
+int execute_payment(struct db_context_t *dbc, union transaction_data_t *data);
 
 #endif /* _SIMPLE_PAYMENT_H_ */

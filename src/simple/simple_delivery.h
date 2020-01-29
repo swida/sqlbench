@@ -16,7 +16,6 @@
 #include <transaction_data.h>
 #include <simple_common.h>
 
-int execute_delivery(struct db_context_t *dbc, struct delivery_t *data);
-int delivery(struct db_context_t *dbc, struct delivery_t *data, char ** vals, int nvals);
+int execute_delivery(struct db_context_t *dbc, union transaction_data_t *data);
 
 #endif /* _SIMPLE_DELIVERY_H_ */

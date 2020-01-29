@@ -9,18 +9,17 @@
 
 
 #include "simple_stock_level.h"
+static int stock_level(struct db_context_t *dbc, struct stock_level_t *data, char **vals, int nvals);
 
-int execute_stock_level(struct db_context_t *dbc, struct stock_level_t *data)
+int
+execute_stock_level(struct db_context_t *dbc, union transaction_data_t *data)
 {
-	int rc;
 	char *  vals[2];
 	int nvals=2;
 
-	rc=stock_level(dbc, data, vals, nvals);
-
-	if (rc == -1 )
+	if (stock_level(dbc, &data->stock_level, vals, nvals) == -1)
 	{
-		LOG_ERROR_MESSAGE("STOCK LEVEL FINISHED WITH ERRORS \n");
+		LOG_ERROR_MESSAGE("STOCK LEVEL FINISHED WITH ERRORS\n");
 
 		//should free memory that was allocated for nvals vars
 		dbt2_free_values(vals, nvals);
@@ -32,7 +31,7 @@ int execute_stock_level(struct db_context_t *dbc, struct stock_level_t *data)
 }
 
 
-int stock_level(struct db_context_t *dbc, struct stock_level_t *data, char ** vals, int nvals)
+static int stock_level(struct db_context_t *dbc, struct stock_level_t *data, char **vals, int nvals)
 {
 	/* Input variables. */
 	int w_id = data->w_id;

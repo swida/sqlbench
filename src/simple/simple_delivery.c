@@ -9,19 +9,20 @@
 
 #include "simple_delivery.h"
 
-int execute_delivery(struct db_context_t *dbc, struct delivery_t *data)
+static int delivery(struct db_context_t *dbc, struct delivery_t *data, char **vals, int nvals);
+
+
+int
+execute_delivery(struct db_context_t *dbc, union transaction_data_t *data)
 {
-	int rc;
 	int nvals=3;
 	char * vals[3];
 
 	dbt2_init_values(vals, nvals);
 
-	rc=delivery(dbc, data, vals, nvals);
-
-	if (rc == -1 )
+	if (delivery(dbc, &data->delivery, vals, nvals) == -1)
 	{
-		LOG_ERROR_MESSAGE("DELIVERY FINISHED WITH ERRORS \n");
+		LOG_ERROR_MESSAGE("DELIVERY FINISHED WITH ERRORS\n");
 
 		//should free memory that was allocated for nvals vars
 		dbt2_free_values(vals, nvals);
@@ -31,7 +32,8 @@ int execute_delivery(struct db_context_t *dbc, struct delivery_t *data)
 	return OK;
 }
 
-int delivery(struct db_context_t *dbc, struct delivery_t *data, char ** vals, int nvals)
+static int
+delivery(struct db_context_t *dbc, struct delivery_t *data, char **vals, int nvals)
 {
 	/* Input variables. */
 	int w_id = data->w_id;

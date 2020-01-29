@@ -43,12 +43,12 @@ extended_initialize_payment(struct db_context_t *dbc)
 }
 
 int
-extended_execute_payment(struct db_context_t *dbc, struct payment_t *data)
+extended_execute_payment(struct db_context_t *dbc, union transaction_data_t *data)
 {
 	char * vals[29];
 	int nvals=29;
 
-	if (payment(dbc, data, vals, nvals) == -1)
+	if (payment(dbc, &data->payment, vals, nvals) == -1)
 	{
 		LOG_ERROR_MESSAGE("PAYMENT FINISHED WITH ERRORS\n");
 

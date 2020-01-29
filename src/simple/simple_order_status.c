@@ -10,18 +10,18 @@
 
 #include "simple_order_status.h"
 #include <string.h>
-int execute_order_status(struct db_context_t *dbc, struct order_status_t *data)
-{
-	int rc;
 
+static int order_status(struct db_context_t *dbc, struct order_status_t *data, char **vals, int  nvals);
+
+int
+execute_order_status(struct db_context_t *dbc, union transaction_data_t *data)
+{
 	int nvals=9;
 	char * vals[9];
 
-	rc= order_status(dbc, data, vals, nvals);
-
-	if (rc == -1 )
+	if (order_status(dbc, &data->order_status, vals, nvals) == -1)
 	{
-		LOG_ERROR_MESSAGE("ORDER_STATUS FINISHED WITH ERRORS %d\n", rc);
+		LOG_ERROR_MESSAGE("ORDER_STATUS FINISHED WITH ERRORS\n");
 
 		//should free memory that was allocated for nvals vars
 		dbt2_free_values(vals, nvals);
@@ -33,7 +33,8 @@ int execute_order_status(struct db_context_t *dbc, struct order_status_t *data)
 }
 
 
-int order_status(struct db_context_t *dbc, struct order_status_t *data, char ** vals, int  nvals)
+static int
+order_status(struct db_context_t *dbc, struct order_status_t *data, char **vals, int  nvals)
 {
 	/* Input variables. */
 	int c_id = data->c_id;

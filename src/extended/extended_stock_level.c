@@ -34,12 +34,12 @@ extended_initialize_stock_level(struct db_context_t *dbc)
 }
 
 int
-extended_execute_stock_level(struct db_context_t *dbc, struct stock_level_t *data)
+extended_execute_stock_level(struct db_context_t *dbc, union transaction_data_t *data)
 {
 	char *  vals[2];
 	int nvals=2;
 
-	if (stock_level(dbc, data, vals, nvals) == -1)
+	if (stock_level(dbc, &data->stock_level, vals, nvals) == -1)
 	{
 		LOG_ERROR_MESSAGE("STOCK LEVEL FINISHED WITH ERRORS\n");
 

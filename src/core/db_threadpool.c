@@ -57,6 +57,12 @@ extern time_t start_time;
 extern time_t stop_time;
 sem_t db_worker_count;
 
+static void
+quick_die()
+{
+	exiting = 1;
+}
+
 static struct transaction_queue_node_t *db_get_transaction(
 	struct db_worker_desc_t *wd)
 {
@@ -134,8 +140,10 @@ void *db_worker(void *data)
 		return NULL;
 
 	if (connect_to_db(dbc) != OK) {
-		if (!reconnect_db)
+		if (!reconnect_db) {
+			quick_die();
 			return NULL;
+		}
 
 		LOG_ERROR_MESSAGE("cannot connect database, try to reconnect after 5 seconds");
 		sleep(5);
@@ -171,9 +179,12 @@ void *db_worker(void *data)
 			 * Assume this isn't a fatal error, send the results
 			 * back, and try processing the next transaction.
 			 */
-			if(need_reconnect_to_db(dbc) && reconnect_db) {
+			if(need_reconnect_to_db(dbc)) {
 				disconnect_from_db(dbc);
-				goto conn_db;
+				if (reconnect_db)
+					goto conn_db;
+				else
+					quick_die();
 			}
 		}
 

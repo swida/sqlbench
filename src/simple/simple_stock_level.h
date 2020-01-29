@@ -16,7 +16,6 @@
 #include <transaction_data.h>
 #include <simple_common.h>
 
-int execute_stock_level(struct db_context_t *dbc, struct stock_level_t *data);
-int stock_level(struct db_context_t *dbc, struct stock_level_t *data, char ** vals, int nvals);
+int execute_stock_level(struct db_context_t *dbc, union transaction_data_t *data);
 
 #endif /* _SIMPLE_STOCK_LEVEL_H_ */

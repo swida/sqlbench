@@ -17,6 +17,6 @@
 #include <extended_common.h>
 
 int extended_initialize_stock_level(struct db_context_t *dbc);
-int extended_execute_stock_level(struct db_context_t *dbc, struct stock_level_t *data);
+int extended_execute_stock_level(struct db_context_t *dbc, union transaction_data_t *data);
 
 #endif /* _EXTENDED_STOCK_LEVEL_H_ */

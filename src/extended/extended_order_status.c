@@ -36,12 +36,12 @@ int extended_initialize_order_status(db_context_t *dbc)
 	return OK;
 }
 
-int extended_execute_order_status(db_context_t *dbc, struct order_status_t *data)
+int extended_execute_order_status(db_context_t *dbc, union transaction_data_t *data)
 {
 	int nvals=9;
 	char *vals[9];
 
-	if (order_status(dbc, data, vals, nvals) == -1)
+	if (order_status(dbc, &data->order_status, vals, nvals) == -1)
 	{
 		LOG_ERROR_MESSAGE("ORDER_STATUS FINISHED WITH ERRORS\n");
 

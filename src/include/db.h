@@ -39,17 +39,14 @@ struct sql_result_t
 };
 
 typedef int (*trx_initializer_t) (db_context_t *dbc);
+typedef int (*trx_executor_t) (
+	db_context_t *dbc, union transaction_data_t *data);
 
 struct sqlapi_operation_t
 {
 	/* Initialization functions for each transaction*/
 	trx_initializer_t trx_initialize[N_TRANSACTIONS];
-	int (*execute_integrity) (db_context_t *dbc, struct integrity_t *data);
-	int (*execute_delivery) (db_context_t *dbc, struct delivery_t *data);
-	int (*execute_new_order) (db_context_t *dbc, struct new_order_t *data);
-	int (*execute_order_status) (db_context_t *dbc, struct order_status_t *data);
-	int (*execute_payment) (db_context_t *dbc, struct payment_t *data);
-	int (*execute_stock_level) (db_context_t *dbc, struct stock_level_t *data);
+	trx_executor_t trx_execute[N_TRANSACTIONS];
 };
 
 extern int connect_to_db(db_context_t *dbc);

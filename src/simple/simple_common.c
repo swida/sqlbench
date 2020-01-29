@@ -21,12 +21,14 @@
 struct sqlapi_operation_t simple_sqlapi_operation =
 {
 	{NULL},
-	execute_integrity,
-	execute_delivery,
-	execute_new_order,
-	execute_order_status,
-	execute_payment,
-	execute_stock_level
+	{
+		execute_delivery,
+		execute_new_order,
+		execute_order_status,
+		execute_payment,
+		execute_stock_level,
+		execute_integrity
+	}
 };
 
 void dbt2_escape_str(char *orig_str, char *esc_str)

@@ -15,14 +15,14 @@ const char s_dist[10][11] = {
 	"s_dist_06", "s_dist_07", "s_dist_08", "s_dist_09", "s_dist_10"
 };
 
-int execute_new_order(struct db_context_t *dbc, struct new_order_t *data)
-{
-	int rc;
+static int new_order(struct db_context_t *dbc, struct new_order_t *data, char **vals, int nvals);
 
+int
+execute_new_order(struct db_context_t *dbc, union transaction_data_t *data)
+{
 	char * vals[6];
 	int nvals=6;
-
-	rc= new_order(dbc, data, vals, nvals);
+	int rc = new_order(dbc, &data->new_order, vals, nvals);
 
 	if (rc)
 	{
@@ -37,7 +37,8 @@ int execute_new_order(struct db_context_t *dbc, struct new_order_t *data)
 	return OK;
 }
 
-int  new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int nvals)
+static int
+new_order(struct db_context_t *dbc, struct new_order_t *data, char **vals, int nvals)
 {
 	/* Input variables. */
 	int w_id = data->w_id;

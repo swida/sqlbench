@@ -17,6 +17,6 @@
 #include <extended_common.h>
 
 int extended_initialize_order_status(db_context_t *dbc);
-int extended_execute_order_status(db_context_t *dbc, struct order_status_t *data);
+int extended_execute_order_status(db_context_t *dbc, union transaction_data_t *data);
 
 #endif /* _SIMPLE_ORDER_STATUS_H_ */

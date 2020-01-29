@@ -23,12 +23,12 @@ extended_initialize_integrity(db_context_t *dbc)
 }
 
 int
-extended_execute_integrity(db_context_t *dbc, struct integrity_t *data)
+extended_execute_integrity(db_context_t *dbc, union transaction_data_t *data)
 {
 	char *vals[1];
 	int nvals=1;
 
-	if (integrity(dbc, data, vals, nvals) == -1)
+	if (integrity(dbc, &data->integrity, vals, nvals) == -1)
 	{
 		LOG_ERROR_MESSAGE("TEST FINISHED WITH ERRORS \n");
 

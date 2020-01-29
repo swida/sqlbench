@@ -88,14 +88,10 @@ int process_transaction(int transaction, db_context_t *dbc,
 	int i;
 	int status;
 
-	switch (transaction) {
-	case INTEGRITY:
-		rc = (*sbo->execute_integrity)(dbc, &td->integrity);
-		break;
-	case DELIVERY:
-		rc = (*(sbo->execute_delivery))(dbc, &td->delivery);
-		break;
-	case NEW_ORDER:
+	assert(transaction >= DELIVERY && transaction < N_TRANSACTIONS);
+	trx_executor_t execute_transaction = sbo->trx_execute[transaction];
+
+	if (transaction == NEW_ORDER) {
 		td->new_order.o_all_local = 1;
 		for (i = 0; i < td->new_order.o_ol_cnt; i++) {
 			if (td->new_order.order_line[i].ol_supply_w_id !=
@@ -104,7 +100,9 @@ int process_transaction(int transaction, db_context_t *dbc,
 				break;
 			}
 		}
-		rc = (*(sbo->execute_new_order))(dbc, &td->new_order);
+
+		rc = execute_transaction(dbc, td);
+
 		if (rc != ERROR && td->new_order.rollback == 0) {
 			/*
 			 * Calculate the adjusted total_amount here to work
@@ -119,20 +117,9 @@ int process_transaction(int transaction, db_context_t *dbc,
 		} else {
 			rc = ERROR;
 		}
-		break;
-	case ORDER_STATUS:
-		rc = (*(sbo->execute_order_status))(dbc, &td->order_status);
-		break;
-	case PAYMENT:
-		rc = (*(sbo->execute_payment))(dbc, &td->payment);
-		break;
-	case STOCK_LEVEL:
-		rc = (*(sbo->execute_stock_level))(dbc, &td->stock_level);
-		break;
-	default:
-		LOG_ERROR_MESSAGE("unknown transaction type %d", transaction);
-		return ERROR;
-	}
+
+	} else
+		rc = execute_transaction(dbc, td);
 
 	/* Commit or rollback the transaction. */
 	if (rc == OK) {

@@ -17,6 +17,6 @@
 #include <extended_common.h>
 
 int extended_initialize_delivery(db_context_t *dbc);
-int extended_execute_delivery(db_context_t *dbc, struct delivery_t *data);
+int extended_execute_delivery(db_context_t *dbc, union transaction_data_t *data);
 
 #endif /* _EXTENDED_DELIVERY_H_ */

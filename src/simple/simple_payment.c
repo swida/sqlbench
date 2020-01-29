@@ -9,19 +9,16 @@
 
 
 #include <simple_payment.h>
-
-int execute_payment(struct db_context_t *dbc, struct payment_t *data)
+static int payment(struct db_context_t *dbc, struct payment_t *data, char **vals, int  nvals);
+int
+execute_payment(struct db_context_t *dbc, union transaction_data_t *data)
 {
-	int rc;
-
 	char * vals[29];
 	int nvals=29;
 
-	rc=payment(dbc, data, vals, nvals);
-
-	if (rc == -1 )
+	if (payment(dbc, &data->payment, vals, nvals) == -1)
 	{
-		LOG_ERROR_MESSAGE("PAYMENT FINISHED WITH ERRORS \n");
+		LOG_ERROR_MESSAGE("PAYMENT FINISHED WITH ERRORS\n");
 
 		//should free memory that was allocated for nvals vars
 		dbt2_free_values(vals, nvals);
@@ -32,7 +29,8 @@ int execute_payment(struct db_context_t *dbc, struct payment_t *data)
 	return OK;
 }
 
-int  payment(struct db_context_t *dbc, struct payment_t *data, char ** vals, int  nvals)
+static int
+payment(struct db_context_t *dbc, struct payment_t *data, char **vals, int  nvals)
 {
 	/* Input variables. */
 	int w_id = data->w_id;

@@ -63,13 +63,13 @@ extended_initialize_new_order(db_context_t *dbc)
 }
 
 int
-extended_execute_new_order(db_context_t *dbc, struct new_order_t *data)
+extended_execute_new_order(db_context_t *dbc, union transaction_data_t *data)
 {
 	int rc;
 
 	char *vals[6];
 	int nvals=6;
-	rc = new_order(dbc, data, vals, nvals);
+	rc = new_order(dbc, &data->new_order, vals, nvals);
 	if (rc)
 	{
 		LOG_ERROR_MESSAGE("NEW_ORDER FINISHED WITH RC %d\n", rc);

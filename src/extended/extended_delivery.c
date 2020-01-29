@@ -38,16 +38,15 @@ extended_initialize_delivery(db_context_t *dbc)
 	return OK;
 }
 
-int extended_execute_delivery(db_context_t *dbc, struct delivery_t *data)
+int extended_execute_delivery(db_context_t *dbc, union transaction_data_t *data)
 {
-	int rc;
 	int nvals=3;
 	char *vals[3];
 
 	dbt2_init_values(vals, nvals);
 
 
-	if (delivery(dbc, data, vals, nvals) == -1)
+	if (delivery(dbc, &data->delivery, vals, nvals) == -1)
 	{
 		LOG_ERROR_MESSAGE("DELIVERY FINISHED WITH ERRORS\n");
 
