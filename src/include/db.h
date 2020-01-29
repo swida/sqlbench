@@ -22,9 +22,10 @@ enum sqlapi_type
 	SQLAPI_STOREPROC
 };
 
-struct db_context_t {
+typedef struct db_context_t {
 	int need_reconnect;
-};
+	void *transaction_data[N_TRANSACTIONS];
+} db_context_t;
 
 struct sql_result_t
 {
@@ -37,24 +38,29 @@ struct sql_result_t
 	};
 };
 
+typedef int (*trx_initializer_t) (db_context_t *dbc);
+
 struct sqlapi_operation_t
 {
-	int (*execute_integrity) (struct db_context_t *dbc, struct integrity_t *data);
-	int (*execute_delivery) (struct db_context_t *dbc, struct delivery_t *data);
-	int (*execute_new_order) (struct db_context_t *dbc, struct new_order_t *data);
-	int (*execute_order_status) (struct db_context_t *dbc, struct order_status_t *data);
-	int (*execute_payment) (struct db_context_t *dbc, struct payment_t *data);
-	int (*execute_stock_level) (struct db_context_t *dbc, struct stock_level_t *data);
+	/* Initialization functions for each transaction*/
+	trx_initializer_t trx_initialize[N_TRANSACTIONS];
+	int (*execute_integrity) (db_context_t *dbc, struct integrity_t *data);
+	int (*execute_delivery) (db_context_t *dbc, struct delivery_t *data);
+	int (*execute_new_order) (db_context_t *dbc, struct new_order_t *data);
+	int (*execute_order_status) (db_context_t *dbc, struct order_status_t *data);
+	int (*execute_payment) (db_context_t *dbc, struct payment_t *data);
+	int (*execute_stock_level) (db_context_t *dbc, struct stock_level_t *data);
 };
 
-extern int connect_to_db(struct db_context_t *dbc);
-extern int need_reconnect_to_db(struct db_context_t *dbc);
+extern int connect_to_db(db_context_t *dbc);
+extern int need_reconnect_to_db(db_context_t *dbc);
 
-struct db_context_t *db_init(void);
+db_context_t *db_init(void);
 
-int disconnect_from_db(struct db_context_t *dbc);
-int process_transaction(int transaction, struct db_context_t *dbc,
-	union transaction_data_t *odbct);
+int disconnect_from_db(db_context_t *dbc);
+int initialize_transactions(db_context_t *dbc);
+int process_transaction(
+	int transaction, db_context_t *dbc, union transaction_data_t *odbct);
 void set_sqlapi_operation(enum sqlapi_type sa_type);
 
 #endif /* _DB_H_ */

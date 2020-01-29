@@ -11,32 +11,39 @@
 #include "extended_order_status.h"
 #include <string.h>
 
-static __thread int order_status_initialized = 0;
-static __thread char *params[3];
-
-static int order_status(struct db_context_t *dbc, struct order_status_t *data, char ** vals, int  nvals);
-
-int extended_execute_order_status(struct db_context_t *dbc, struct order_status_t *data)
+struct extended_order_status_data 
 {
-	int rc;
+	char *params[3];
+	void *stmt[5];
+};
 
+static int order_status(db_context_t *dbc, struct order_status_t *data, char ** vals, int  nvals);
+
+int extended_initialize_order_status(db_context_t *dbc)
+{
+	struct extended_order_status_data *etd = malloc(sizeof(struct extended_order_status_data));
+	if (!etd)
+		return ERROR;
+
+	etd->stmt[1] = dbc_sql_prepare(dbc, ORDER_STATUS_1, N_ORDER_STATUS_1);
+	etd->stmt[2] = dbc_sql_prepare(dbc, ORDER_STATUS_2, N_ORDER_STATUS_2);
+	etd->stmt[3] = dbc_sql_prepare(dbc, ORDER_STATUS_3, N_ORDER_STATUS_3);
+	etd->stmt[4] = dbc_sql_prepare(dbc, ORDER_STATUS_4, N_ORDER_STATUS_4);
+
+	dbt2_init_params(etd->params, 3, 24);
+
+	dbc->transaction_data[ORDER_STATUS] = etd;
+	return OK;
+}
+
+int extended_execute_order_status(db_context_t *dbc, struct order_status_t *data)
+{
 	int nvals=9;
-	char * vals[9];
+	char *vals[9];
 
-	if(order_status_initialized == 0)
+	if (order_status(dbc, data, vals, nvals) == -1)
 	{
-		dbc_sql_prepare(dbc, ORDER_STATUS_1, N_ORDER_STATUS_1);
-		dbc_sql_prepare(dbc, ORDER_STATUS_2, N_ORDER_STATUS_2);
-		dbc_sql_prepare(dbc, ORDER_STATUS_3, N_ORDER_STATUS_3);
-		dbc_sql_prepare(dbc, ORDER_STATUS_4, N_ORDER_STATUS_4);
-		dbt2_init_params(params, 3, 24);
-		order_status_initialized = 1;
-	}
-	rc= order_status(dbc, data, vals, nvals);
-
-	if (rc == -1 )
-	{
-		LOG_ERROR_MESSAGE("ORDER_STATUS FINISHED WITH ERRORS %d\n", rc);
+		LOG_ERROR_MESSAGE("ORDER_STATUS FINISHED WITH ERRORS\n");
 
 		//should free memory that was allocated for nvals vars
 		dbt2_free_values(vals, nvals);
@@ -49,8 +56,10 @@ int extended_execute_order_status(struct db_context_t *dbc, struct order_status_
 
 
 static int
-order_status(struct db_context_t *dbc, struct order_status_t *data, char ** vals, int  nvals)
+order_status(db_context_t *dbc, struct order_status_t *data, char ** vals, int nvals)
 {
+	struct extended_order_status_data *etd = dbc->transaction_data[ORDER_STATUS];
+	char **params = etd->params;
 	/* Input variables. */
 	int c_id = data->c_id;
 	int c_w_id = data->c_w_id;
@@ -97,11 +106,11 @@ order_status(struct db_context_t *dbc, struct order_status_t *data, char ** vals
 		sprintf(params[2], "%s", c_last);
 
 #ifdef DEBUG_QUERY
-		LOG_ERROR_MESSAGE("%s %s, $1 = %d, $2 = %d, $3 = %s\n",
+		LOG_ERROR_MESSAGE("%s: %s, $1 = %d, $2 = %d, $3 = %s\n",
 						  N_ORDER_STATUS_1, ORDER_STATUS_1, c_w_id, c_d_id, c_last);
 #endif
 		result.num_rows = -1;
-		if (dbc_sql_execute_prepared(dbc, params, num_params, &result, N_ORDER_STATUS_1) && result.result_set)
+		if (dbc_sql_execute_prepared(dbc, params, num_params, &result, etd->stmt[1]) && result.result_set)
 		{
 			// 2.6.2.2 says the (n/2 rounded up)-th row
 			if(result.num_rows != -1)
@@ -196,11 +205,11 @@ order_status(struct db_context_t *dbc, struct order_status_t *data, char ** vals
 	sprintf(params[2], "%d", my_c_id);
 
 #ifdef DEBUG_QUERY
-	LOG_ERROR_MESSAGE("%s %s, $1 = %d, $2 = %d, $3 = %d\n",
+	LOG_ERROR_MESSAGE("%s: %s, $1 = %d, $2 = %d, $3 = %d\n",
 					  N_ORDER_STATUS_2, ORDER_STATUS_2,
 					  c_w_id, c_d_id, my_c_id);
 #endif
-	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, N_ORDER_STATUS_2) && result.result_set)
+	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, etd->stmt[2]) && result.result_set)
 	{
 		dbc_sql_fetchrow(dbc, &result);
 
@@ -219,10 +228,10 @@ order_status(struct db_context_t *dbc, struct order_status_t *data, char ** vals
 
 #ifdef DEBUG_QUERY
 	LOG_ERROR_MESSAGE(
-		"%s %s, $1 = %d, $2 = %d, $3 = %d\n",
+		"%s: %s, $1 = %d, $2 = %d, $3 = %d\n",
 		N_ORDER_STATUS_3, ORDER_STATUS_3, c_w_id, c_d_id, my_c_id);
 #endif
-	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, N_ORDER_STATUS_3) && result.result_set)
+	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, etd->stmt[3]) && result.result_set)
 	{
 		dbc_sql_fetchrow(dbc, &result);
 
@@ -246,11 +255,11 @@ order_status(struct db_context_t *dbc, struct order_status_t *data, char ** vals
 	/* just last parameter is different with prevous query */
 	sprintf(params[2], "%s", vals[O_ID]);
 #ifdef DEBUG_QUERY
-	LOG_ERROR_MESSAGE("%s %s, $1 = %d, $2 = %d, $3 = %s\n", N_ORDER_STATUS_4, ORDER_STATUS_4,
+	LOG_ERROR_MESSAGE("%s: %s, $1 = %d, $2 = %d, $3 = %s\n", N_ORDER_STATUS_4, ORDER_STATUS_4,
 					  c_w_id, c_d_id, vals[O_ID]);
 #endif
 
-	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, N_ORDER_STATUS_4) && result.result_set)
+	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, etd->stmt[4]) && result.result_set)
 	{
 		i= 0;
 		while (dbc_sql_fetchrow(dbc, &result))

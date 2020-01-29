@@ -68,7 +68,20 @@ int need_reconnect_to_db(struct db_context_t *dbc)
 	return dbc->need_reconnect;
 }
 
-int process_transaction(int transaction, struct db_context_t *dbc,
+int
+initialize_transactions(db_context_t *dbc)
+{
+	int rc = OK;
+	for(int i = 0; i < N_TRANSACTIONS; i++) {
+		trx_initializer_t trx_init = sbo->trx_initialize[i];
+		if (trx_init && trx_init(dbc) != OK)
+			rc = ERROR;
+	}
+
+	return rc;
+}
+
+int process_transaction(int transaction, db_context_t *dbc,
 	union transaction_data_t *td)
 {
 	int rc;
@@ -77,7 +90,7 @@ int process_transaction(int transaction, struct db_context_t *dbc,
 
 	switch (transaction) {
 	case INTEGRITY:
-		rc = (*(sbo->execute_integrity))(dbc, &td->integrity);
+		rc = (*sbo->execute_integrity)(dbc, &td->integrity);
 		break;
 	case DELIVERY:
 		rc = (*(sbo->execute_delivery))(dbc, &td->delivery);

@@ -9,28 +9,39 @@
 
 
 #include "extended_stock_level.h"
-static __thread int stock_level_initialized = 0;
-static __thread char *params[5];
+struct extended_stock_level_data
+{
+	void *stmt[3];
+	char *params[5];
+};
+
 static int
 stock_level(struct db_context_t *dbc, struct stock_level_t *data, char ** vals, int nvals);
 
-int extended_execute_stock_level(struct db_context_t *dbc, struct stock_level_t *data)
+int
+extended_initialize_stock_level(struct db_context_t *dbc)
 {
-	int rc;
+	struct extended_stock_level_data *etd = malloc(sizeof(struct extended_stock_level_data));
+	if (!etd)
+		return ERROR;
+
+	etd->stmt[1] = dbc_sql_prepare(dbc, STOCK_LEVEL_1, N_STOCK_LEVEL_1);
+	etd->stmt[2] = dbc_sql_prepare(dbc, STOCK_LEVEL_2, N_STOCK_LEVEL_2);
+	dbt2_init_params(etd->params, 5, 24);
+	dbc->transaction_data[STOCK_LEVEL] = etd;
+
+	return OK;
+}
+
+int
+extended_execute_stock_level(struct db_context_t *dbc, struct stock_level_t *data)
+{
 	char *  vals[2];
 	int nvals=2;
-	if(stock_level_initialized == 0)
-	{
-		dbc_sql_prepare(dbc, STOCK_LEVEL_1, N_STOCK_LEVEL_1);
-		dbc_sql_prepare(dbc, STOCK_LEVEL_2, N_STOCK_LEVEL_2);
-		dbt2_init_params(params, 5, 24);
-		stock_level_initialized = 1;
-	}
-	rc=stock_level(dbc, data, vals, nvals);
 
-	if (rc == -1 )
+	if (stock_level(dbc, data, vals, nvals) == -1)
 	{
-		LOG_ERROR_MESSAGE("STOCK LEVEL FINISHED WITH ERRORS \n");
+		LOG_ERROR_MESSAGE("STOCK LEVEL FINISHED WITH ERRORS\n");
 
 		//should free memory that was allocated for nvals vars
 		dbt2_free_values(vals, nvals);
@@ -45,6 +56,9 @@ int extended_execute_stock_level(struct db_context_t *dbc, struct stock_level_t 
 static int
 stock_level(struct db_context_t *dbc, struct stock_level_t *data, char ** vals, int nvals)
 {
+	struct extended_stock_level_data *etd = dbc->transaction_data[STOCK_LEVEL];
+	char **params = etd->params;
+
 	/* Input variables. */
 	int w_id = data->w_id;
 	int d_id = data->d_id;
@@ -66,10 +80,10 @@ stock_level(struct db_context_t *dbc, struct stock_level_t *data, char ** vals, 
 	num_params = 2;
 
 #ifdef DEBUG_QUERY
-	LOG_ERROR_MESSAGE("%s query: %s, $1 = %d, $2 = %d\n",
+	LOG_ERROR_MESSAGE("%s: %s, $1 = %d, $2 = %d\n",
 					  N_STOCK_LEVEL_1, STOCK_LEVEL_1, w_id, d_id);
 #endif
-	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, N_STOCK_LEVEL_1) && result.result_set)
+	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, etd->stmt[1]) && result.result_set)
 	{
 		dbc_sql_fetchrow(dbc, &result);
 		vals[D_NEXT_O_ID] = dbc_sql_getvalue(dbc, &result, 0); //D_NEXT_O_ID
@@ -77,7 +91,7 @@ stock_level(struct db_context_t *dbc, struct stock_level_t *data, char ** vals, 
 
 		if (!vals[D_NEXT_O_ID])
 		{
-            LOG_ERROR_MESSAGE("ERROR: D_NEXT_O_ID=NULL for query %s:\n%s\n", N_STOCK_LEVEL_1, STOCK_LEVEL_1);
+            LOG_ERROR_MESSAGE("ERROR: D_NEXT_O_ID=NULL for %s:\n%s\n", N_STOCK_LEVEL_1, STOCK_LEVEL_1);
             return -1;
 		}
 		d_next_o_id = atoi(vals[D_NEXT_O_ID]);
@@ -94,11 +108,11 @@ stock_level(struct db_context_t *dbc, struct stock_level_t *data, char ** vals, 
 	num_params = 5;
 
 #ifdef DEBUG_QUERY
-	LOG_ERROR_MESSAGE("%s query: %s, $1 = %d, $2 = %d, $3 = %d, $4 = %d, $5 = %d\n",
+	LOG_ERROR_MESSAGE("%s: %s, $1 = %d, $2 = %d, $3 = %d, $4 = %d, $5 = %d\n",
 					  N_STOCK_LEVEL_2, STOCK_LEVEL_2,
 					  w_id, d_id, d_next_o_id - 1, d_next_o_id - 20, threshold);
 #endif
-	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, N_STOCK_LEVEL_2) && result.result_set)
+	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, etd->stmt[2]) && result.result_set)
 	{
 		dbc_sql_fetchrow(dbc, &result);
 

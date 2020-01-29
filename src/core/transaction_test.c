@@ -56,7 +56,7 @@ usage(const char *progname)
 int main(int argc, char *argv[])
 {
 	int transaction = -1;
-	struct db_context_t *dbc;
+	db_context_t *dbc;
 	union transaction_data_t transaction_data;
 	enum sqlapi_type use_sqlapi_type = SQLAPI_SIMPLE;
 
@@ -232,6 +232,12 @@ parse_dbc_type_done:
 			printf("cannot establish a database connection\n");
 			return 1;
 		}
+
+		if (initialize_transactions(dbc) != OK) {
+			printf("fail to initialize transactions\n");
+			return 1;
+		}
+
 		if (process_transaction(transaction, dbc,
 			(void *) &transaction_data) != OK) {
 			disconnect_from_db(dbc);

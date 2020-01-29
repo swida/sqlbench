@@ -26,7 +26,7 @@ static pthread_mutex_t db_source_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 struct odbc_context_t
 {
-	struct db_context_t base;
+	db_context_t base;
 	SQLHDBC hdbc;
 	SQLHSTMT hstmt;
 };
@@ -87,7 +87,7 @@ log_odbc_error(char *filename, int line, SQLSMALLINT handle_type,
 #define LOG_ODBC_ERROR(type, handle) log_odbc_error(__FILE__, __LINE__, type, handle)
 
 static int
-odbc_commit_transaction(struct db_context_t *_dbc)
+odbc_commit_transaction(db_context_t *_dbc)
 {
 	int i;
 	struct odbc_context_t *dbc = (struct odbc_context_t*) _dbc;
@@ -102,7 +102,7 @@ odbc_commit_transaction(struct db_context_t *_dbc)
 }
 
 /* Open an ODBC connection to the database. */
-static int odbc_connect_to_db(struct db_context_t *dbc)
+static int odbc_connect_to_db(db_context_t *dbc)
 {
 	SQLRETURN rc;
 	struct odbc_context_t *odbcc = (struct odbc_context_t*) dbc;
@@ -157,7 +157,7 @@ static int odbc_connect_to_db(struct db_context_t *dbc)
  * we don't touch it here.
  */
 static int
-odbc_disconnect_from_db(struct db_context_t *dbc)
+odbc_disconnect_from_db(db_context_t *dbc)
 {
 	SQLRETURN rc;
 	struct odbc_context_t *odbcc = (struct odbc_context_t*) dbc;
@@ -183,10 +183,10 @@ odbc_disconnect_from_db(struct db_context_t *dbc)
 }
 
 /* Initialize ODBC environment handle and the database connect string. */
-static struct db_context_t *
+static db_context_t *
 odbc_db_init()
 {
-	struct db_context_t *context;
+	db_context_t *context;
 	SQLRETURN rc;
 
 	/* Initialized the environment handle. */
@@ -207,7 +207,7 @@ odbc_db_init()
 }
 
 static int
-odbc_rollback_transaction(struct db_context_t *_dbc)
+odbc_rollback_transaction(db_context_t *_dbc)
 {
 	int i;
 	struct odbc_context_t *dbc = (struct odbc_context_t*) _dbc;
@@ -222,7 +222,7 @@ odbc_rollback_transaction(struct db_context_t *_dbc)
 }
 
 static int
-odbc_sql_execute(struct db_context_t *_dbc, char *query,
+odbc_sql_execute(db_context_t *_dbc, char *query,
 		struct sql_result_t *sql_result, char *query_name)
 {
 	int i;
@@ -288,7 +288,7 @@ odbc_sql_execute(struct db_context_t *_dbc, char *query,
 }
 
 static int
-odbc_sql_close_cursor(struct db_context_t *_dbc,
+odbc_sql_close_cursor(db_context_t *_dbc,
 		struct sql_result_t * sql_result)
 {
 	SQLRETURN   rc;
@@ -311,7 +311,7 @@ odbc_sql_close_cursor(struct db_context_t *_dbc,
 
 
 static int
-odbc_sql_fetchrow(struct db_context_t *_dbc,
+odbc_sql_fetchrow(db_context_t *_dbc,
 		struct sql_result_t * sql_result)
 {
 	SQLRETURN  rc;
@@ -330,7 +330,7 @@ odbc_sql_fetchrow(struct db_context_t *_dbc,
 }
 
 static char *
-odbc_sql_getvalue(struct db_context_t *_dbc,
+odbc_sql_getvalue(db_context_t *_dbc,
 				  struct sql_result_t *sql_result, int field)
 {
 	SQLRETURN rc;
@@ -351,7 +351,7 @@ odbc_sql_getvalue(struct db_context_t *_dbc,
 		}
 	}
 
-	return tmp;
+	return OK;
 }
 
 static struct option *

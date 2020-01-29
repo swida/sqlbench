@@ -45,6 +45,7 @@ int startup();
 /* Global Variables */
 int db_connections = 0;
 int db_conn_sleep = 200; /* milliseconds */
+int reconnect_db = 0;
 struct db_worker_desc_t *db_worker_desc;
 pthread_t *db_worker_tids;
 int db_worker_started = 0;
@@ -128,11 +129,22 @@ void *db_worker(void *data)
 	/* Open a connection to the database. */
 	dbc = db_init();
 
-	if (!exiting && connect_to_db(dbc) != OK) {
-		LOG_ERROR_MESSAGE("connect_to_db() error, terminating program");
-		printf("cannot connect to database(see details in error.log file, exiting...\n");
-		exit(1);
+ conn_db:
+	if (exiting)
+		return NULL;
+
+	if (connect_to_db(dbc) != OK) {
+		if (!reconnect_db)
+			return NULL;
+
+		LOG_ERROR_MESSAGE("cannot connect database, try to reconnect after 5 seconds");
+		sleep(5);
+
+		goto conn_db;
 	}
+
+	if (initialize_transactions(dbc) != OK)
+		return NULL;
 
 	while (!exiting) {
 		/*
@@ -159,16 +171,9 @@ void *db_worker(void *data)
 			 * Assume this isn't a fatal error, send the results
 			 * back, and try processing the next transaction.
 			 */
-			while (need_reconnect_to_db(dbc))
-			{
-				LOG_ERROR_MESSAGE("try to reconnect to database");
+			if(need_reconnect_to_db(dbc) && reconnect_db) {
 				disconnect_from_db(dbc);
-
-				if (connect_to_db(dbc) != OK)
-				{
-					LOG_ERROR_MESSAGE("reconnect to database error, try again after sleep 5 seconds");
-					sleep(5);
-				}
+				goto conn_db;
 			}
 		}
 

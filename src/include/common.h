@@ -26,8 +26,11 @@
 #define ORDER_STATUS 2
 #define PAYMENT 3
 #define STOCK_LEVEL 4
-#define TRANSACTION_MAX 5
-#define INTEGRITY 10
+#define INTEGRITY 5
+
+#define TRANSACTION_MAX 5		/* no integrity */
+/* transaction count include integrity transaction */
+#define N_TRANSACTIONS 6
 
 #define TABLE_WAREHOUSE 0
 #define TABLE_DISTRICT 1

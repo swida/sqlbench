@@ -16,6 +16,7 @@
 #include <transaction_data.h>
 #include <extended_common.h>
 
+int extended_initialize_payment(struct db_context_t *dbc);
 int extended_execute_payment(struct db_context_t *dbc, struct payment_t *data);
 
 #endif /* _EXTENDED_PAYMENT_H_ */

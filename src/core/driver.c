@@ -96,7 +96,7 @@ int integrity_terminal_worker()
 {
 
 	int rc;
-	struct db_context_t *dbc;
+	db_context_t *dbc;
 	struct client_transaction_t client_data;
 	client_data.transaction = INTEGRITY;
 	/* Open a connection to the database. */

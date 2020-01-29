@@ -9,37 +9,47 @@
 
 #include "extended_delivery.h"
 
-static __thread int delivery_initialized = 0;
-static __thread char *params[4];
+struct extended_delivery_data
+{
+	char *params[4];
+	void *stmt[8];
+};
 
 static int
-delivery(struct db_context_t *dbc, struct delivery_t *data, char ** vals, int nvals);
+delivery(db_context_t *dbc, struct delivery_t *data, char ** vals, int nvals);
 
-int extended_execute_delivery(struct db_context_t *dbc, struct delivery_t *data)
+int
+extended_initialize_delivery(db_context_t *dbc)
+{
+	struct extended_delivery_data *eda = malloc(sizeof(struct extended_delivery_data));
+	if (!eda)
+		return ERROR;
+
+	eda->stmt[1] = dbc_sql_prepare(dbc, DELIVERY_1, N_DELIVERY_1);
+	eda->stmt[2] = dbc_sql_prepare(dbc, DELIVERY_2, N_DELIVERY_2);
+	eda->stmt[3] = dbc_sql_prepare(dbc, DELIVERY_3, N_DELIVERY_3);
+	eda->stmt[4] = dbc_sql_prepare(dbc, DELIVERY_4, N_DELIVERY_4);
+	eda->stmt[5] = dbc_sql_prepare(dbc, DELIVERY_5, N_DELIVERY_5);
+	eda->stmt[6] = dbc_sql_prepare(dbc, DELIVERY_6, N_DELIVERY_6);
+	eda->stmt[7] = dbc_sql_prepare(dbc, DELIVERY_7, N_DELIVERY_7);
+	dbt2_init_params(eda->params, 4, 24);
+
+	dbc->transaction_data[DELIVERY] = eda;
+	return OK;
+}
+
+int extended_execute_delivery(db_context_t *dbc, struct delivery_t *data)
 {
 	int rc;
 	int nvals=3;
-	char * vals[3];
+	char *vals[3];
 
-	if(delivery_initialized == 0)
-	{
-		dbc_sql_prepare(dbc, DELIVERY_1, N_DELIVERY_1);
-		dbc_sql_prepare(dbc, DELIVERY_2, N_DELIVERY_2);
-		dbc_sql_prepare(dbc, DELIVERY_3, N_DELIVERY_3);
-		dbc_sql_prepare(dbc, DELIVERY_4, N_DELIVERY_4);
-		dbc_sql_prepare(dbc, DELIVERY_5, N_DELIVERY_5);
-		dbc_sql_prepare(dbc, DELIVERY_6, N_DELIVERY_6);
-		dbc_sql_prepare(dbc, DELIVERY_7, N_DELIVERY_7);
-		dbt2_init_params(params, 4, 24);
-		delivery_initialized = 1;
-	}
 	dbt2_init_values(vals, nvals);
 
-	rc=delivery(dbc, data, vals, nvals);
 
-	if (rc == -1 )
+	if (delivery(dbc, data, vals, nvals) == -1)
 	{
-		LOG_ERROR_MESSAGE("DELIVERY FINISHED WITH ERRORS \n");
+		LOG_ERROR_MESSAGE("DELIVERY FINISHED WITH ERRORS\n");
 
 		//should free memory that was allocated for nvals vars
 		dbt2_free_values(vals, nvals);
@@ -50,8 +60,10 @@ int extended_execute_delivery(struct db_context_t *dbc, struct delivery_t *data)
 }
 
 static int
-delivery(struct db_context_t *dbc, struct delivery_t *data, char ** vals, int nvals)
+delivery(db_context_t *dbc, struct delivery_t *data, char **vals, int nvals)
 {
+	struct extended_delivery_data *eda = dbc->transaction_data[DELIVERY];
+	char **params = eda->params;
 	/* Input variables. */
 	int w_id = data->w_id;
 	int o_carrier_id = data->o_carrier_id;
@@ -74,7 +86,7 @@ delivery(struct db_context_t *dbc, struct delivery_t *data, char ** vals, int nv
 		LOG_ERROR_MESSAGE("%s: %s, $1 = %d, $2 = %d\n",
 						  N_DELIVERY_1, DELIVERY_1, w_id, d_id);
 #endif
-		if (dbc_sql_execute_prepared(dbc, params, num_params, &result, N_DELIVERY_1) && result.result_set)
+		if (dbc_sql_execute_prepared(dbc, params, num_params, &result, eda->stmt[1]) && result.result_set)
 		{
             dbc_sql_fetchrow(dbc, &result);
             vals[NO_O_ID]= (char *)dbc_sql_getvalue(dbc, &result, 0);  //NO_O_ID
@@ -99,13 +111,13 @@ delivery(struct db_context_t *dbc, struct delivery_t *data, char ** vals, int nv
 			sprintf(params[2], "%d", d_id);
 			num_params = 3;
 
-            if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, N_DELIVERY_2))
+            if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, eda->stmt[2]))
             {
 				return -1;
             }
 
 			/* params is same with prevous query */
-            if (dbc_sql_execute_prepared(dbc, params, num_params, &result, N_DELIVERY_3) && result.result_set)
+            if (dbc_sql_execute_prepared(dbc, params, num_params, &result, eda->stmt[3]) && result.result_set)
             {
 				dbc_sql_fetchrow(dbc, &result);
 				vals[O_C_ID]= (char *)dbc_sql_getvalue(dbc, &result, 0);  //O_C_ID
@@ -128,7 +140,7 @@ delivery(struct db_context_t *dbc, struct delivery_t *data, char ** vals, int nv
 			sprintf(params[3], "%d", d_id);
 			num_params = 4;
 
-            if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, N_DELIVERY_4))
+            if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, eda->stmt[4]))
             {
 				return -1;
             }
@@ -137,13 +149,13 @@ delivery(struct db_context_t *dbc, struct delivery_t *data, char ** vals, int nv
 			sprintf(params[2], "%d", d_id);
 			num_params = 3;
 
-            if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, N_DELIVERY_5))
+            if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, eda->stmt[5]))
             {
 				return -1;
             }
 
 			/* params same with prevous one */
-            if (dbc_sql_execute_prepared(dbc, params, num_params, &result, N_DELIVERY_6) && result.result_set)
+            if (dbc_sql_execute_prepared(dbc, params, num_params, &result, eda->stmt[6]) && result.result_set)
             {
 				dbc_sql_fetchrow(dbc, &result);
 				vals[OL_AMOUNT]= (char *)dbc_sql_getvalue(dbc, &result, 0);  //OL_AMOUNT
@@ -164,7 +176,7 @@ delivery(struct db_context_t *dbc, struct delivery_t *data, char ** vals, int nv
 			sprintf(params[3], "%d", d_id);
 			num_params = 4;
 
-            if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, N_DELIVERY_7))
+            if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, eda->stmt[7]))
             {
 				LOG_ERROR_MESSAGE("%s: OL_AMOUNT: |%s| O_C_ID: |%s|", N_DELIVERY_7, vals[OL_AMOUNT],
 								  vals[O_C_ID]);

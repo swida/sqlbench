@@ -16,6 +16,7 @@
 #include <transaction_data.h>
 #include <extended_common.h>
 
-int extended_execute_integrity(struct db_context_t *dbc, struct integrity_t *data);
+int extended_initialize_integrity(db_context_t *dbc);
+int extended_execute_integrity(db_context_t *dbc, struct integrity_t *data);
 
 #endif /* _EXTENDED_INTEGRITY_H_ */

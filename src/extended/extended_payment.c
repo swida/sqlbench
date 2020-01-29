@@ -10,37 +10,47 @@
 
 #include <extended_payment.h>
 
-static __thread int payment_initialized = 0;
-static __thread char *params[7];
+struct extended_payment_data
+{
+	char *params[7];
+	void *stmt[10];
+};
 
 static int payment(struct db_context_t *dbc, struct payment_t *data, char ** vals, int  nvals);
 
-int extended_execute_payment(struct db_context_t *dbc, struct payment_t *data)
+int
+extended_initialize_payment(struct db_context_t *dbc)
 {
-	int rc;
+	struct extended_payment_data *etd = malloc(sizeof(struct extended_payment_data));
+	if (!etd)
+		return ERROR;
 
+	etd->stmt[1] = dbc_sql_prepare(dbc, PAYMENT_1, N_PAYMENT_1);
+	etd->stmt[2] = dbc_sql_prepare(dbc, PAYMENT_2, N_PAYMENT_2);
+	etd->stmt[3] = dbc_sql_prepare(dbc, PAYMENT_3, N_PAYMENT_3);
+	etd->stmt[4] = dbc_sql_prepare(dbc, PAYMENT_4, N_PAYMENT_4);
+	etd->stmt[5] = dbc_sql_prepare(dbc, PAYMENT_5, N_PAYMENT_5);
+	etd->stmt[6] = dbc_sql_prepare(dbc, PAYMENT_6, N_PAYMENT_6);
+	etd->stmt[7] = dbc_sql_prepare(dbc, PAYMENT_7_GC, N_PAYMENT_7_GC);
+	etd->stmt[8] = dbc_sql_prepare(dbc, PAYMENT_7_BC, N_PAYMENT_7_BC);
+	etd->stmt[9] = dbc_sql_prepare(dbc, PAYMENT_8, N_PAYMENT_8);
+
+	dbt2_init_params(etd->params, 6, 24);
+
+	dbc->transaction_data[PAYMENT] = etd;
+
+	return OK;
+}
+
+int
+extended_execute_payment(struct db_context_t *dbc, struct payment_t *data)
+{
 	char * vals[29];
 	int nvals=29;
 
-	if(payment_initialized == 0)
+	if (payment(dbc, data, vals, nvals) == -1)
 	{
-		dbc_sql_prepare(dbc, PAYMENT_1, N_PAYMENT_1);
-		dbc_sql_prepare(dbc, PAYMENT_2, N_PAYMENT_2);
-		dbc_sql_prepare(dbc, PAYMENT_3, N_PAYMENT_3);
-		dbc_sql_prepare(dbc, PAYMENT_4, N_PAYMENT_4);
-		dbc_sql_prepare(dbc, PAYMENT_5, N_PAYMENT_5);
-		dbc_sql_prepare(dbc, PAYMENT_6, N_PAYMENT_6);
-		dbc_sql_prepare(dbc, PAYMENT_7_GC, N_PAYMENT_7_GC);
-		dbc_sql_prepare(dbc, PAYMENT_7_BC, N_PAYMENT_7_BC);
-		dbc_sql_prepare(dbc, PAYMENT_8, N_PAYMENT_8);
-		dbt2_init_params(params, 6, 24);
-		payment_initialized = 1;
-	}
-	rc=payment(dbc, data, vals, nvals);
-
-	if (rc == -1 )
-	{
-		LOG_ERROR_MESSAGE("PAYMENT FINISHED WITH ERRORS \n");
+		LOG_ERROR_MESSAGE("PAYMENT FINISHED WITH ERRORS\n");
 
 		//should free memory that was allocated for nvals vars
 		dbt2_free_values(vals, nvals);
@@ -54,6 +64,9 @@ int extended_execute_payment(struct db_context_t *dbc, struct payment_t *data)
 static int
 payment(struct db_context_t *dbc, struct payment_t *data, char ** vals, int  nvals)
 {
+	struct extended_payment_data *etd = dbc->transaction_data[PAYMENT];
+	char **params = etd->params;
+
 	/* Input variables. */
 	int w_id = data->w_id;
 	int d_id = data->d_id;
@@ -105,15 +118,16 @@ payment(struct db_context_t *dbc, struct payment_t *data, char ** vals, int  nva
 	snprintf(c_last, C_LAST_LEN+1, "%s", data->c_last);
 
 #ifdef DEBUG_INPUT_DATA
-	LOG_ERROR_MESSAGE("PAYMENT_INPUT: w_id: %d\n         d_id: %d\n         c_id: %d\n         c_w_id: %d\n         c_d_id: %d\n",w_id,d_id,c_id,c_w_id,c_d_id);
+	LOG_ERROR_MESSAGE("PAYMENT_INPUT: w_id: %d\n         d_id: %d\n         c_id: %d\n         c_w_id: %d\n         c_d_id: %d\n",
+					  w_id,d_id,c_id,c_w_id,c_d_id);
 #endif
 	sprintf(params[0], "%d", w_id);
 	num_params = 1;
 
 #ifdef DEBUG_QUERY
-	LOG_ERROR_MESSAGE("%s query: %s, $1 = %d\n", N_PAYMENT_1, PAYMENT_1, w_id);
+	LOG_ERROR_MESSAGE("%s: %s, $1 = %d\n", N_PAYMENT_1, PAYMENT_1, w_id);
 #endif
-	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, N_PAYMENT_1) && result.result_set)
+	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, etd->stmt[1]) && result.result_set)
 	{
 		dbc_sql_fetchrow(dbc, &result);
 
@@ -137,11 +151,11 @@ payment(struct db_context_t *dbc, struct payment_t *data, char ** vals, int  nva
 	num_params = 2;
 
 #ifdef DEBUG_QUERY
-	LOG_ERROR_MESSAGE("%s query: %s, $1 = %f, $2 = %d\n",
+	LOG_ERROR_MESSAGE("%s: %s, $1 = %f, $2 = %d\n",
 					  N_PAYMENT_2, PAYMENT_2, h_amount, w_id);
 #endif
 
-	if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, N_PAYMENT_2))
+	if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, etd->stmt[2]))
 	{
 		return -1;
 	}
@@ -149,11 +163,11 @@ payment(struct db_context_t *dbc, struct payment_t *data, char ** vals, int  nva
 	/* the 2nd and num of params is same with prevous one */
 
 #ifdef DEBUG_QUERY
-	LOG_ERROR_MESSAGE("%s query: %s, $1 = %d, $2 = %d\n",
+	LOG_ERROR_MESSAGE("%s: %s, $1 = %d, $2 = %d\n",
 					  N_PAYMENT_3, PAYMENT_3, d_id, w_id);
 #endif
 
-	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, N_PAYMENT_3) && result.result_set)
+	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, etd->stmt[3]) && result.result_set)
 	{
 		dbc_sql_fetchrow(dbc, &result);
 
@@ -178,11 +192,11 @@ payment(struct db_context_t *dbc, struct payment_t *data, char ** vals, int  nva
 	num_params = 3;
 
 #ifdef DEBUG_QUERY
-	LOG_ERROR_MESSAGE("%s query: %s, $1 = %f, $2 = %d, $3 = %d\n",
+	LOG_ERROR_MESSAGE("%s: %s, $1 = %f, $2 = %d, $3 = %d\n",
 					  N_PAYMENT_4, PAYMENT_4, h_amount, d_id, w_id);
 #endif
 
-	if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, N_PAYMENT_4))
+	if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, etd->stmt[4]))
 	{
 		return -1;
 	}
@@ -194,11 +208,11 @@ payment(struct db_context_t *dbc, struct payment_t *data, char ** vals, int  nva
 		/* the 2nd parameter and num of params is same with prevous query*/
 
 #ifdef DEBUG_QUERY
-		LOG_ERROR_MESSAGE("%s query: %s, $1 = %d, $2 = %d, $3 = %s\n",
+		LOG_ERROR_MESSAGE("%s: %s, $1 = %d, $2 = %d, $3 = %s\n",
 						  N_PAYMENT_5, PAYMENT_5, w_id, d_id, c_last);
 #endif
 
-		if (dbc_sql_execute_prepared(dbc, params, num_params, &result, N_PAYMENT_5) && result.result_set)
+		if (dbc_sql_execute_prepared(dbc, params, num_params, &result, etd->stmt[5]) && result.result_set)
 		{
             dbc_sql_fetchrow(dbc, &result);
             vals[TMP_C_ID]= dbc_sql_getvalue(dbc, &result, 0);
@@ -227,10 +241,10 @@ payment(struct db_context_t *dbc, struct payment_t *data, char ** vals, int  nva
 	/* num of params is same with prevous one */
 
 #ifdef DEBUG_QUERY
-	LOG_ERROR_MESSAGE("%s query: %s, $1 = %d, $2 = %d, $3 = %d\n",
+	LOG_ERROR_MESSAGE("%s: %s, $1 = %d, $2 = %d, $3 = %d\n",
 					  N_PAYMENT_6, PAYMENT_6, c_w_id, c_d_id, my_c_id);
 #endif
-	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, N_PAYMENT_6) && result.result_set)
+	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, etd->stmt[6]) && result.result_set)
 	{
 		dbc_sql_fetchrow(dbc, &result);
 		//C_FIRST C_MIDDLE MY_C_LAST
@@ -260,7 +274,7 @@ payment(struct db_context_t *dbc, struct payment_t *data, char ** vals, int  nva
 
 		if (!vals[C_CREDIT])
 		{
-            LOG_ERROR_MESSAGE("ERROR: C_CREDIT=NULL for query %s:\n%s\n", N_PAYMENT_6, PAYMENT_6);
+            LOG_ERROR_MESSAGE("ERROR: C_CREDIT=NULL for %s:\n%s\n", N_PAYMENT_6, PAYMENT_6);
             return -1;
 		}
 	}
@@ -280,10 +294,10 @@ payment(struct db_context_t *dbc, struct payment_t *data, char ** vals, int  nva
 
 #ifdef DEBUG_QUERY
 		LOG_ERROR_MESSAGE(
-			"%s query: %s, $1 = %f, $2 = %d, $3 = %d, $4 = %d\n",
+			"%s: %s, $1 = %f, $2 = %d, $3 = %d, $4 = %d\n",
 			N_PAYMENT_7_GC, PAYMENT_7_GC, h_amount, my_c_id, c_w_id, c_d_id);
 #endif
-		if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, N_PAYMENT_7_GC))
+		if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, etd->stmt[7]))
 		{
             return -1;
 		}
@@ -303,12 +317,12 @@ payment(struct db_context_t *dbc, struct payment_t *data, char ** vals, int  nva
 		num_params = 5;
 
 #ifdef DEBUG_QUERY
-		LOG_ERROR_MESSAGE("%s query: %s, $1 = %f, $2 = %s, $3 = %d, $4 = %d, $5 = %d\n",
+		LOG_ERROR_MESSAGE("%s: %s, $1 = %f, $2 = %s, $3 = %d, $4 = %d, $5 = %d\n",
 						  N_PAYMENT_7_BC, PAYMENT_7_BC,
 						  h_amount, my_c_data, my_c_id, c_w_id, c_d_id);
 #endif
 
-		if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, N_PAYMENT_7_BC))
+		if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, etd->stmt[8]))
 		{
 			params[1] = my_tmp_param;
             return -1;
@@ -329,12 +343,12 @@ payment(struct db_context_t *dbc, struct payment_t *data, char ** vals, int  nva
 
 #ifdef DEBUG_QUERY
 	LOG_ERROR_MESSAGE(
-		"%s query: %s, $1 = %d, $2 = %d, $3 = %d, $4 = %d, $5 = %d, $6 = %f, $7 = '%s %s'\n",
+		"%s: %s, $1 = %d, $2 = %d, $3 = %d, $4 = %d, $5 = %d, $6 = %f, $7 = '%s %s'\n",
 		N_PAYMENT_8, PAYMENT_8, my_c_id, c_d_id, c_w_id, d_id, w_id,
 		h_amount, vals[W_NAME], vals[D_NAME]);
 #endif
 
-	if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, N_PAYMENT_8))
+	if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, etd->stmt[9]))
 	{
 		return -1;
 	}

@@ -28,6 +28,8 @@ int exiting = 0;
 
 int perform_integrity_check = 0;
 int no_thinktime = 0;
+extern int reconnect_db;
+
 /* use store procedure to test */
 enum sqlapi_type use_sqlapi_type = SQLAPI_SIMPLE;
 int parse_arguments(int argc, char *argv[]);
@@ -43,23 +45,27 @@ static void usage(const char *progname)
 	printf("usage: %s -t <dbms> -c # -w # -l # [-r #] [-s #] [-e #] [-o p] [-z]", progname);
 	printf("\n");
 	printf("-t <dbms>\n");
-	printf("\t specify database to test (mandatory), available:%s\n", dbc_manager_get_dbcnames());
+	printf("\t specify database to test (mandatory, must be 1st option), available:%s\n", dbc_manager_get_dbcnames());
 	printf("%s", dbc_manager_get_dbcusages());
 	printf("-c #\n");
 	printf("\tnumber of database connections, mandatory\n");
-	printf("-w #\n");
-	printf("\twarehouse cardinality, default %d\n", table_cardinality.warehouses);
+	printf("-I/--sqlapi #\n");
+	printf("\trun test using database interfaces(default: simple), available:\n");
+	printf("\tsimple      just send sql statement to database\n");
+	printf("\textended    use extended (prepare/bind/execute) protocol, better than simple\n");
+	printf("\tstoreproc   use store procedure\n");
 	printf("-l #\n");
 	printf("\tthe duration of the run in seconds, default: %d min\n", duration / 60);
-	printf("\n");
+	printf("-o #\n");
+	printf("\toutput directory of log files, default current directory\n");
 	printf("-r #\n");
 	printf("\tthe duration of ramp up in seconds, default ramp up until all threads started\n");
 	printf("-s #\n");
 	printf("\tlower warehouse id, default %d\n", w_id_min);
 	printf("-e #\n");
 	printf("\tupper warehouse id, set according to warehouse cardinality (-w) by default\n");
-	printf("-o p\n");
-	printf("\toutput directory of log files, default current directory\n");
+	printf("-w #\n");
+	printf("\twarehouse cardinality, default %d\n", table_cardinality.warehouses);
 	printf("-z\n");
 	printf("\tperform database integrity check, disabled by default\n");
 	printf("\n");
@@ -111,19 +117,13 @@ static void usage(const char *progname)
 	printf("--tts #\n");
 	printf("\tstock-level thinking time, default %d ms\n",
 		   THINK_TIME_STOCK_LEVEL);
+	printf("\n");
 	printf("--no-thinktime\n");
 	printf("\tno think time and keying time to every transaction, disabled by default\n");
-	printf("\n");
 	printf("--tpw #\n");
 	printf("\tterminals started per warehouse, default 10\n");
-	printf("\n");
 	printf("--sleep #\n");
 	printf("\tnumber of milliseconds to sleep between database connections, default %d ms\n", db_conn_sleep);
-	printf("--sqlapi\n");
-	printf("\trun test using database interfaces(default: simple), available:\n");
-	printf("\tsimple      just send sql statement to database\n");
-	printf("\textended    use extended (prepare/bind/execute) protocol, better than simple\n");
-	printf("\tstoreproc   use store procedure\n");
 }
 
 int main(int argc, char *argv[])
@@ -310,6 +310,7 @@ int parse_arguments(int argc, char *argv[])
 	struct option *all_long_options;
 
 	static struct option main_long_options[] = {
+		{"sqlapi", required_argument, 0, 'I'},
 		{"customer", required_argument, 0, 1},
 		{"item", required_argument, 0, 2},
 		{"order", required_argument, 0, 3},
@@ -332,7 +333,7 @@ int parse_arguments(int argc, char *argv[])
 		{"no-thinktime", no_argument, 0, 20},
 		{"tpw", required_argument, 0, 21},
 		{"sleep", required_argument, 0, 22},
-		{"sqlapi", required_argument, 0, 23},
+		{"--try-reconnect", no_argument, 0, 23},
 		{0, 0, 0, 0}
 	};
 
@@ -379,11 +380,10 @@ parse_dbc_type_done:
 	while (1) {
 		int option_index = 0;
 
-		c = getopt_long(argc, argv, "c:e:l:o:s:r:t:w:z",
+		c = getopt_long(argc, argv, "c:e:I:l:o:s:r:t:w:z",
 						all_long_options, &option_index);
-		if (c == -1) {
+		if (c == -1)
 			break;
-		}
 
 		switch (c) {
 		case 0:					/* dbc options */
@@ -398,6 +398,19 @@ parse_dbc_type_done:
 			break;
 		case 'e':
 			w_id_max = atoi(optarg);
+			break;
+		case 'I':
+			if (strcasecmp(optarg, "simple") == 0)
+				use_sqlapi_type = SQLAPI_SIMPLE;
+			else if (strcasecmp(optarg, "extended") == 0)
+				use_sqlapi_type = SQLAPI_EXTENDED;
+			else if (strcasecmp(optarg, "storeproc") == 0)
+				use_sqlapi_type = SQLAPI_STOREPROC;
+			else
+			{
+				rc = ERROR;
+				goto _end;
+			}
 			break;
 		case 'l':
 			set_duration(atoi(optarg));
@@ -485,17 +498,7 @@ parse_dbc_type_done:
 			db_conn_sleep = atoi(optarg);
 			break;
 		case 23:
-			if (strcasecmp(optarg, "simple") == 0)
-				use_sqlapi_type = SQLAPI_SIMPLE;
-			else if (strcasecmp(optarg, "extended") == 0)
-				use_sqlapi_type = SQLAPI_EXTENDED;
-			else if (strcasecmp(optarg, "storeproc") == 0)
-				use_sqlapi_type = SQLAPI_STOREPROC;
-			else
-			{
-				rc = ERROR;
-				goto _end;
-			}
+			reconnect_db = 1;
 			break;
 		case '?':
 			rc = ERROR;

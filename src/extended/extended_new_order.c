@@ -9,52 +9,67 @@
 
 
 #include <extended_new_order.h>
-
-static __thread int new_order_initialized = 0;
-static __thread char *params[9];
+#include <string.h>
 
 static const char s_dist[10][11] = {
 	"s_dist_01", "s_dist_02", "s_dist_03", "s_dist_04", "s_dist_05",
 	"s_dist_06", "s_dist_07", "s_dist_08", "s_dist_09", "s_dist_10"
 };
-static int
-new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int nvals);
 
-int extended_execute_new_order(struct db_context_t *dbc, struct new_order_t *data)
+struct extended_new_order_data
+{
+	char *params[9];
+	void *stmt[11];
+	void *stmt8[10];
+};
+
+static int
+new_order(db_context_t *dbc, struct new_order_t *data, char ** vals, int nvals);
+
+int
+extended_initialize_new_order(db_context_t *dbc)
+{
+	char query[128];
+	char query_name[32];
+	int i;
+
+	struct extended_new_order_data *etd = malloc(sizeof(struct extended_new_order_data));
+	if (!etd)
+		return ERROR;
+
+	etd->stmt[1] = dbc_sql_prepare(dbc, NEW_ORDER_1, N_NEW_ORDER_1);
+	if(_is_forupdate_supported)
+		etd->stmt[2] = dbc_sql_prepare(dbc, NEW_ORDER_2, N_NEW_ORDER_2);
+	else
+		etd->stmt[2] = dbc_sql_prepare(
+			dbc, NEW_ORDER_2_WITHOUT_FORUPDATE, N_NEW_ORDER_2_WITHOUT_FORUPDATE);
+	etd->stmt[3] = dbc_sql_prepare(dbc, NEW_ORDER_3, N_NEW_ORDER_3);
+	etd->stmt[4] = dbc_sql_prepare(dbc, NEW_ORDER_4, N_NEW_ORDER_4);
+	etd->stmt[5] = dbc_sql_prepare(dbc, NEW_ORDER_5, N_NEW_ORDER_5);
+	etd->stmt[6] = dbc_sql_prepare(dbc, NEW_ORDER_6, N_NEW_ORDER_6);
+	etd->stmt[7] = dbc_sql_prepare(dbc, NEW_ORDER_7, N_NEW_ORDER_7);
+	for(i = 0; i < sizeof(s_dist) / sizeof(s_dist[0]); i++)
+	{
+		sprintf(query_name, "%s_%s", N_NEW_ORDER_8, s_dist[i]);
+		sprintf(query, NEW_ORDER_8, s_dist[i]);
+		etd->stmt8[i] = dbc_sql_prepare(dbc, query, strdup(query_name));
+	}
+	etd->stmt[9] = dbc_sql_prepare(dbc, NEW_ORDER_9, N_NEW_ORDER_9);
+	etd->stmt[10] = dbc_sql_prepare(dbc, NEW_ORDER_10, N_NEW_ORDER_10);
+	dbt2_init_params(etd->params, 8, 24);
+	dbc->transaction_data[NEW_ORDER] = etd;
+
+	return OK;
+}
+
+int
+extended_execute_new_order(db_context_t *dbc, struct new_order_t *data)
 {
 	int rc;
 
-	char * vals[6];
+	char *vals[6];
 	int nvals=6;
-	if(new_order_initialized == 0)
-	{
-		char query[128];
-		char query_name[32];
-		int i;
-		dbc_sql_prepare(dbc, NEW_ORDER_1, N_NEW_ORDER_1);
-		if(_is_forupdate_supported)
-			dbc_sql_prepare(dbc, NEW_ORDER_2, N_NEW_ORDER_2);
-		else
-			dbc_sql_prepare(
-				dbc, NEW_ORDER_2_WITHOUT_FORUPDATE, N_NEW_ORDER_2_WITHOUT_FORUPDATE);
-		dbc_sql_prepare(dbc, NEW_ORDER_3, N_NEW_ORDER_3);
-		dbc_sql_prepare(dbc, NEW_ORDER_4, N_NEW_ORDER_4);
-		dbc_sql_prepare(dbc, NEW_ORDER_5, N_NEW_ORDER_5);
-		dbc_sql_prepare(dbc, NEW_ORDER_6, N_NEW_ORDER_6);
-		dbc_sql_prepare(dbc, NEW_ORDER_7, N_NEW_ORDER_7);
-		for(i = 0; i < sizeof(s_dist) / sizeof(s_dist[0]); i++)
-		{
-			sprintf(query_name, "%s_%s", N_NEW_ORDER_8, s_dist[i]);
-			sprintf(query, NEW_ORDER_8, s_dist[i]);
-			dbc_sql_prepare(dbc, query, query_name);
-		}
-		dbc_sql_prepare(dbc, NEW_ORDER_9, N_NEW_ORDER_9);
-		dbc_sql_prepare(dbc, NEW_ORDER_10, N_NEW_ORDER_10);
-		dbt2_init_params(params, 8, 24);
-		new_order_initialized = 1;
-	}
-	rc= new_order(dbc, data, vals, nvals);
-
+	rc = new_order(dbc, data, vals, nvals);
 	if (rc)
 	{
 		LOG_ERROR_MESSAGE("NEW_ORDER FINISHED WITH RC %d\n", rc);
@@ -69,8 +84,11 @@ int extended_execute_new_order(struct db_context_t *dbc, struct new_order_t *dat
 }
 
 static int
-new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int nvals)
+new_order(db_context_t *dbc, struct new_order_t *data, char ** vals, int nvals)
 {
+	struct extended_new_order_data *etd = dbc->transaction_data[NEW_ORDER];
+	char **params = etd->params;
+
 	/* Input variables. */
 	int w_id = data->w_id;
 	int d_id = data->d_id;
@@ -128,7 +146,7 @@ new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int 
 #ifdef DEBUG_QUERY
 	LOG_ERROR_MESSAGE("%s: %s, $1 = %s\n",N_NEW_ORDER_1, NEW_ORDER_1, params[0]);
 #endif
-	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, N_NEW_ORDER_1) && result.result_set)
+	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, etd->stmt[1]) && result.result_set)
 	{
 		dbc_sql_fetchrow(dbc, &result);
 
@@ -139,22 +157,16 @@ new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int 
 	{
 		return 10;
 	}
-	if(_is_forupdate_supported)
-		sprintf(query_name, "%s", N_NEW_ORDER_2);
-	else
-		sprintf(query_name, "%s", N_NEW_ORDER_2_WITHOUT_FORUPDATE);
+
 	sprintf(params[0], "%d", w_id);
 	sprintf(params[1], "%d", d_id);
 	num_params = 2;
 
 #ifdef DEBUG_QUERY
-	if(_is_forupdate_supported)
-		LOG_ERROR_MESSAGE("%s query: %s, $1 = %d, $2 = %d\n", query_name, N_NEW_ORDER_2, w_id, d_id);
-	else
-		LOG_ERROR_MESSAGE("%s query: %s, $1 = %d, $2 = %d\n", query_name, N_NEW_ORDER_2_WITHOUT_FORUPDATE, w_id, d_id);
+	LOG_ERROR_MESSAGE("%s: %s, $1 = %d, $2 = %d\n", N_NEW_ORDER_2, NEW_ORDER_2, w_id, d_id);
 #endif
 
-	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, query_name) && result.result_set)
+	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, etd->stmt[2]) && result.result_set)
 	{
 		dbc_sql_fetchrow(dbc, &result);
 
@@ -177,14 +189,12 @@ new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int 
 
 	/* parameters is same with prevous one */
 #ifdef DEBUG_QUERY
-	LOG_ERROR_MESSAGE("%s query: %s, $1 = %d, $2 = %d\n",
-					  N_NEW_ORDER_3, NEW_ORDER_3, w_id, d_id);
+	LOG_ERROR_MESSAGE("%s: %s, $1 = %d, $2 = %d\n", N_NEW_ORDER_3, NEW_ORDER_3, w_id, d_id);
 #endif
 
-	if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, N_NEW_ORDER_3))
-	{
+	if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, etd->stmt[3]))
 		return 12;
-	}
+
 	sprintf(params[2], "%d", c_id);
 	num_params = 3;
 
@@ -193,7 +203,7 @@ new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int 
 		"%s: %s, $1 = %d, $2 = %d, $3 = %d\n",
 		N_NEW_ORDER_4, NEW_ORDER_4, w_id, d_id, c_id);
 #endif
-	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, N_NEW_ORDER_4) && result.result_set)
+	if (dbc_sql_execute_prepared(dbc, params, num_params, &result, etd->stmt[4]) && result.result_set)
 	{
 		dbc_sql_fetchrow(dbc, &result);
 
@@ -219,10 +229,10 @@ new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int 
 
 #ifdef DEBUG_QUERY
 	LOG_ERROR_MESSAGE(
-		"%s query: %s, $1 = %s, $2 = %d, $3 = %d, $4 = %d, $5 = %d, $6 = %d\n",
+		"%s: %s, $1 = %s, $2 = %d, $3 = %d, $4 = %d, $5 = %d, $6 = %d\n",
 		N_NEW_ORDER_6, NEW_ORDER_6, vals[D_NEXT_O_ID] , d_id, w_id, c_id, o_ol_cnt, o_all_local);
 #endif
-	if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, N_NEW_ORDER_6))
+	if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, etd->stmt[6]))
 	{
 		return 15;
 	}
@@ -238,7 +248,7 @@ new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int 
 					  N_NEW_ORDER_5, NEW_ORDER_5, vals[D_NEXT_O_ID],
 					  w_id, d_id);
 #endif
-	if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, N_NEW_ORDER_5))
+	if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, etd->stmt[5]))
 	{
 		return 14;
 	}
@@ -250,11 +260,11 @@ new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int 
 		sprintf(params[0], "%d", ol_i_id[i]);
 		num_params = 1;
 #ifdef DEBUG_QUERY
-		LOG_ERROR_MESSAGE("%s query: %s, $1 = %d\n", ol_i_id[i]);
+		LOG_ERROR_MESSAGE("%s: %s, $1 = %d\n", N_NEW_ORDER_7, NEW_ORDER_7, ol_i_id[i]);
 #endif
 		if (ol_i_id[i] != 0)
 		{
-            if (dbc_sql_execute_prepared(dbc, params, num_params, &result, N_NEW_ORDER_7) && result.result_set)
+            if (dbc_sql_execute_prepared(dbc, params, num_params, &result, etd->stmt[7]) && result.result_set)
             {
 				dbc_sql_fetchrow(dbc, &result);
 
@@ -288,17 +298,15 @@ new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int 
 		}
 
 		ol_amount[i] = atof(i_price[i] ) * (float) ol_quantity[i];
-		sprintf(query_name, "%s_%s", N_NEW_ORDER_8, s_dist[d_id - 1]);
 		sprintf(params[0], "%d", ol_i_id[i]);
 		sprintf(params[1], "%d", w_id);
 		num_params = 2;
 
 #ifdef DEBUG_QUERY
 		LOG_ERROR_MESSAGE(
-			"%s query: %s, %%s = %s, $2 = %d, $3 = %d\n",
-			query_name, NEW_ORDER_8, s_dist[d_id - 1], ol_i_id[i], w_id);
+			"%s, %%s = %s, $2 = %d, $3 = %d\n", NEW_ORDER_8, s_dist[d_id - 1], ol_i_id[i], w_id);
 #endif
-		if (dbc_sql_execute_prepared(dbc, params, num_params, &result, query_name) && result.result_set)
+		if (dbc_sql_execute_prepared(dbc, params, num_params, &result, etd->stmt8[d_id - 1]) && result.result_set)
 		{
             dbc_sql_fetchrow(dbc, &result);
 
@@ -309,16 +317,14 @@ new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int 
             dbc_sql_close_cursor(dbc, &result);
 			if (!s_quantity[i] || !my_s_dist[i])
 			{
-				LOG_ERROR_MESSAGE("NULL or empty result returned: %s query %s, %%s = %s, $1 = %s, %2 = %s",
-								  query_name, NEW_ORDER_8, s_dist[d_id -1], params[0], params[1]);
+				LOG_ERROR_MESSAGE("NULL or empty result returned: query %s, %%s = %s, $1 = %s, %2 = %s",
+								  NEW_ORDER_8, s_dist[d_id -1], params[0], params[1]);
 				rc = 16;
 				break;
 			}
 		}
 		else //error
 		{
-            LOG_ERROR_MESSAGE("%s query: %s, %%s = %s, $1 = %s, %2 = %s",
-							  query_name, NEW_ORDER_8, s_dist[d_id -1], params[0], params[1]);
             rc=16;
             break;
 		}
@@ -341,10 +347,10 @@ new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int 
 			"%s query: %s, $1 = %s, $2 = %s, $3 = %s\n",
 			N_NEW_ORDER_9, NEW_ORDER_9, params[0], params[1], params[2]);
 #endif
-		if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, N_NEW_ORDER_9))
+		if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, etd->stmt[9]))
 		{
             LOG_ERROR_MESSAGE(
-				"%s query: %s, $1 = %s, $2 = %s, $3 = %s\n",
+				"%s: %s, $1 = %s, $2 = %s, $3 = %s\n",
 				N_NEW_ORDER_9, NEW_ORDER_9, params[0], params[1], params[2]);
             rc=17;
             break;
@@ -361,20 +367,20 @@ new_order(struct db_context_t *dbc, struct new_order_t *data, char ** vals, int 
 		num_params = 9;
 #ifdef DEBUG_QUERY
 		LOG_ERROR_MESSAGE(
-		"%s query: %s, $1 = %s, $2 = %d, $3 = %d, $4 = %d, $5 = %d, "
+		"%s: %s, $1 = %s, $2 = %d, $3 = %d, $4 = %d, $5 = %d, "
 		"$6 = %d, $7 = %d, $8 = %f, $9 = %s\n",
 		N_NEW_ORDER_10, NEW_ORDER_10,
 		vals[D_NEXT_O_ID] , d_id, w_id, i + 1, ol_i_id[i],
 		ol_supply_w_id[i], ol_quantity[i], ol_amount[i], my_s_dist[i] );
 #endif
-		if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, N_NEW_ORDER_10))
+		if (!dbc_sql_execute_prepared(dbc, params, num_params, NULL, etd->stmt[10]))
 		{
 			LOG_ERROR_MESSAGE(
-		"%s query: %s, $1 = %s, $2 = %d, $3 = %d, $4 = %d, $5 = %d, "
-		"$6 = %d, $7 = %d, $8 = %f, $9 = %s\n",
-		N_NEW_ORDER_10, NEW_ORDER_10,
-		vals[D_NEXT_O_ID] , d_id, w_id, i + 1, ol_i_id[i],
-		ol_supply_w_id[i], ol_quantity[i], ol_amount[i], my_s_dist[i] );
+				"%s query: %s, $1 = %s, $2 = %d, $3 = %d, $4 = %d, $5 = %d, "
+				"$6 = %d, $7 = %d, $8 = %f, $9 = %s\n",
+				N_NEW_ORDER_10, NEW_ORDER_10,
+				vals[D_NEXT_O_ID] , d_id, w_id, i + 1, ol_i_id[i],
+				ol_supply_w_id[i], ol_quantity[i], ol_amount[i], my_s_dist[i] );
             rc=18;
             break;
 		}

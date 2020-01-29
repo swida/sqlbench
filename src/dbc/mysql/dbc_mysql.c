@@ -8,7 +8,7 @@
 
 struct mysql_context_t
 {
-	struct db_context_t base;
+	db_context_t base;
 	MYSQL *mysql;
 	int inTransaction;
 };
@@ -43,7 +43,7 @@ static char my_pass[32];
 static char my_sock[256];
 
 static int
-mysql_commit_transaction(struct db_context_t *_dbc)
+mysql_commit_transaction(db_context_t *_dbc)
 {
 	struct mysql_context_t *dbc = (struct mysql_context_t*) _dbc;
 	if(!dbc->inTransaction)
@@ -62,7 +62,7 @@ mysql_commit_transaction(struct db_context_t *_dbc)
 }
 
 static int
-mysql_rollback_transaction(struct db_context_t *_dbc)
+mysql_rollback_transaction(db_context_t *_dbc)
 {
 	struct mysql_context_t *dbc = (struct mysql_context_t*) _dbc;
 
@@ -81,17 +81,17 @@ mysql_rollback_transaction(struct db_context_t *_dbc)
 	return STATUS_ROLLBACK;
 }
 
-static struct db_context_t *
+static db_context_t *
 mysql_db_init()
 {
-	struct db_context_t *context = malloc(sizeof(struct mysql_context_t));
+	db_context_t *context = malloc(sizeof(struct mysql_context_t));
 	memset(context, 0, sizeof(struct mysql_context_t));
 	return context;
 }
 
 /* Open a connection to the database. */
 static int
-mysql_connect_to_db(struct db_context_t *_dbc)
+mysql_connect_to_db(db_context_t *_dbc)
 {
 	struct mysql_context_t *dbc = (struct mysql_context_t*) _dbc;
 	dbc->mysql=mysql_init(NULL);
@@ -131,7 +131,7 @@ mysql_connect_to_db(struct db_context_t *_dbc)
 
 /* Disconnect from the database and free the connection handle. */
 static int
-mysql_disconnect_from_db(struct db_context_t *_dbc)
+mysql_disconnect_from_db(db_context_t *_dbc)
 {
 	struct mysql_context_t *dbc = (struct mysql_context_t*) _dbc;
 	mysql_close(dbc->mysql);
@@ -141,7 +141,7 @@ mysql_disconnect_from_db(struct db_context_t *_dbc)
 }
 
 static int
-mysql_sql_execute(struct db_context_t *_dbc, char *query,
+mysql_sql_execute(db_context_t *_dbc, char *query,
 				  struct sql_result_t *sql_result,
 				  char *query_name)
 {
@@ -190,7 +190,7 @@ mysql_sql_execute(struct db_context_t *_dbc, char *query,
 }
 
 static int
-mysql_sql_fetchrow(struct db_context_t *_dbc, struct sql_result_t * sql_result)
+mysql_sql_fetchrow(db_context_t *_dbc, struct sql_result_t * sql_result)
 {
 	(void) _dbc;
 
@@ -201,7 +201,7 @@ mysql_sql_fetchrow(struct db_context_t *_dbc, struct sql_result_t * sql_result)
 }
 
 static int
-mysql_sql_close_cursor(struct db_context_t *_dbc, struct sql_result_t * sql_result)
+mysql_sql_close_cursor(db_context_t *_dbc, struct sql_result_t * sql_result)
 {
 	if (!sql_result->result_set)
 		return 1;
@@ -211,7 +211,7 @@ mysql_sql_close_cursor(struct db_context_t *_dbc, struct sql_result_t * sql_resu
 }
 
 static char *
-mysql_sql_getvalue(struct db_context_t *_dbc, struct sql_result_t * sql_result, int field)
+mysql_sql_getvalue(db_context_t *_dbc, struct sql_result_t * sql_result, int field)
 {
 	long *lengths = mysql_fetch_lengths(sql_result->result_set);
 	long num_fields = mysql_num_fields(sql_result->result_set);
@@ -347,7 +347,7 @@ static int dbc_local_infile_read(void *ptr, char *buf, unsigned int buf_len)
 
 /* load opreations */
 static struct loader_stream_t *
-mysql_open_loader_stream(struct db_context_t *_dbc, const char *table_name, char delimiter, char *null_str)
+mysql_open_loader_stream(db_context_t *_dbc, const char *table_name, char delimiter, char *null_str)
 {
 	struct mysql_context_t *dbc = (struct mysql_context_t*) _dbc;
 	struct mysql_loader_stream_t *stream;
@@ -358,7 +358,7 @@ mysql_open_loader_stream(struct db_context_t *_dbc, const char *table_name, char
 		return NULL;
 	}
 	stream->cursor = 0;
-	stream->base.dbc = (struct db_context_t *)dbc;
+	stream->base.dbc = (db_context_t *)dbc;
 	stream->table_name = table_name;
 	stream->delimiter = delimiter;
 	stream->null_str = null_str;

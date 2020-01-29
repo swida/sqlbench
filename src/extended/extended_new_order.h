@@ -16,6 +16,7 @@
 #include <transaction_data.h>
 #include "extended_common.h"
 
-int extended_execute_new_order(struct db_context_t *dbc, struct new_order_t *data);
+int extended_initialize_new_order(db_context_t *dbc);
+int extended_execute_new_order(db_context_t *dbc, struct new_order_t *data);
 
 #endif /* _SIMPLE_NEW_ORDER_H_ */

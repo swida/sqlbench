@@ -20,6 +20,7 @@
 
 struct sqlapi_operation_t simple_sqlapi_operation =
 {
+	{NULL},
 	execute_integrity,
 	execute_delivery,
 	execute_new_order,

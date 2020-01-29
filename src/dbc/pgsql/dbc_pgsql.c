@@ -20,7 +20,7 @@
 
 struct pgsql_context_t
 {
-	struct db_context_t base;
+	db_context_t base;
 	PGconn *conn;
 	int inTransaction;
 };
@@ -42,7 +42,7 @@ static int dbname_count = 0;
 static int last_dbname_connected = 0;
 
 static int
-pgsql_commit_transaction(struct db_context_t *_dbc)
+pgsql_commit_transaction(db_context_t *_dbc)
 {
 	struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
 	PGresult *res;
@@ -69,7 +69,7 @@ pgsql_commit_transaction(struct db_context_t *_dbc)
 
 /* Open a connection to the database. */
 static int
-pgsql_connect_to_db(struct db_context_t *_dbc)
+pgsql_connect_to_db(db_context_t *_dbc)
 {
 	struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
 	char buf[1024];
@@ -122,7 +122,7 @@ pgsql_connect_to_db(struct db_context_t *_dbc)
 
 /* Disconnect from the database and free the connection handle. */
 static int
-pgsql_disconnect_from_db(struct db_context_t *_dbc)
+pgsql_disconnect_from_db(db_context_t *_dbc)
 {
 	struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
 	PQfinish(dbc->conn);
@@ -130,16 +130,16 @@ pgsql_disconnect_from_db(struct db_context_t *_dbc)
 	return OK;
 }
 
-static struct db_context_t *
+static db_context_t *
 pgsql_db_init()
 {
-	struct db_context_t *context = malloc(sizeof(struct pgsql_context_t));
+	db_context_t *context = malloc(sizeof(struct pgsql_context_t));
 	memset(context, 0, sizeof(struct pgsql_context_t));
 	return context;
 }
 
 static int
-pgsql_rollback_transaction(struct db_context_t *_dbc)
+pgsql_rollback_transaction(db_context_t *_dbc)
 {
 	struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
 	PGresult *res;
@@ -166,7 +166,7 @@ pgsql_rollback_transaction(struct db_context_t *_dbc)
 }
 
 static int
-pgsql_sql_execute(struct db_context_t *_dbc, char * query, struct sql_result_t *sql_result,
+pgsql_sql_execute(db_context_t *_dbc, char * query, struct sql_result_t *sql_result,
 				  char *query_name)
 {
 	struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
@@ -213,12 +213,12 @@ pgsql_sql_execute(struct db_context_t *_dbc, char * query, struct sql_result_t *
 	return OK;
 }
 
-static int
-pgsql_sql_prepare(struct db_context_t *_dbc,  char *query, char *query_name)
+static void *
+pgsql_sql_prepare(db_context_t *_dbc,  char *query, void *query_name)
 {
 	struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
 
-	PGresult *res = PQprepare(dbc->conn, query_name, query, 0, NULL);
+	PGresult *res = PQprepare(dbc->conn, (char *)query_name, query, 0, NULL);
 	if (!res || PQresultStatus(res) != PGRES_COMMAND_OK) {
 		LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
 		PQclear(res);
@@ -226,18 +226,18 @@ pgsql_sql_prepare(struct db_context_t *_dbc,  char *query, char *query_name)
 		if (PQstatus(dbc->conn) != CONNECTION_OK)
 			dbc->base.need_reconnect = 1;
 
-		return ERROR;
+		return NULL;
 	}
 
 	PQclear(res);
-	return OK;
+	return query_name;
 }
 
 static int
 pgsql_sql_execute_prepared(
-	struct db_context_t *_dbc,
+	db_context_t *_dbc,
 	char **params, int num_params, struct sql_result_t * sql_result,
-	char * query_name)
+	void *query_name)
 {
 	struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
 	PGresult *res;
@@ -259,7 +259,9 @@ pgsql_sql_execute_prepared(
 		PQclear(res);
 		dbc->inTransaction = 1;
 	}
-	res = PQexecPrepared(dbc->conn, query_name, num_params, (const char * const *)params, NULL, NULL, 0);
+	res = PQexecPrepared(
+		dbc->conn, (char *)query_name,
+		num_params, (const char * const *)params, NULL, NULL, 0);
 	if (!res || (PQresultStatus(res) != PGRES_COMMAND_OK &&
 				 PQresultStatus(res) != PGRES_TUPLES_OK)) {
 		LOG_ERROR_MESSAGE("%s", PQerrorMessage(dbc->conn));
@@ -284,7 +286,7 @@ pgsql_sql_execute_prepared(
 }
 
 static int
-pgsql_sql_fetchrow(struct db_context_t *_dbc, struct sql_result_t * sql_result)
+pgsql_sql_fetchrow(db_context_t *_dbc, struct sql_result_t * sql_result)
 {
 	PGresult *res = (PGresult *)sql_result->result_set;
 	sql_result->current_row_num++;
@@ -294,7 +296,7 @@ pgsql_sql_fetchrow(struct db_context_t *_dbc, struct sql_result_t * sql_result)
 }
 
 static int
-pgsql_sql_close_cursor(struct db_context_t *_dbc, struct sql_result_t * sql_result)
+pgsql_sql_close_cursor(db_context_t *_dbc, struct sql_result_t * sql_result)
 {
 	PGresult *res = (PGresult *)sql_result->result_set;
 	PQclear(res);
@@ -302,7 +304,7 @@ pgsql_sql_close_cursor(struct db_context_t *_dbc, struct sql_result_t * sql_resu
 }
 
 static char *
-pgsql_sql_getvalue(struct db_context_t *_dbc, struct sql_result_t * sql_result, int field)
+pgsql_sql_getvalue(db_context_t *_dbc, struct sql_result_t * sql_result, int field)
 {
 	PGresult *res = (PGresult *)sql_result->result_set;
 	char *tmp = NULL;
@@ -324,7 +326,7 @@ pgsql_sql_getvalue(struct db_context_t *_dbc, struct sql_result_t * sql_result, 
 
 /* load opreations */
 static struct loader_stream_t *
-pgsql_open_loader_stream(struct db_context_t *_dbc, const char *table_name, char delimiter, char *null_str)
+pgsql_open_loader_stream(db_context_t *_dbc, const char *table_name, char delimiter, char *null_str)
 {
   struct pgsql_context_t *dbc = (struct pgsql_context_t*) _dbc;
   char *buf;
@@ -359,7 +361,7 @@ pgsql_open_loader_stream(struct db_context_t *_dbc, const char *table_name, char
 	  return NULL;
   }
 
-  stream->base.dbc = (struct db_context_t *)dbc;
+  stream->base.dbc = (db_context_t *)dbc;
   stream->cursor = 0;
 
   return (struct loader_stream_t *)stream;

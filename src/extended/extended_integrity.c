@@ -8,21 +8,27 @@
  */
 
 #include "extended_integrity.h"
-static int integrity(struct db_context_t *dbc, struct integrity_t *data, char ** vals, int nvals);
-static __thread int integrity_initialized = 0;
-int extended_execute_integrity(struct db_context_t *dbc, struct integrity_t *data)
-{
-	int rc;
-	char *  vals[1];
-	int nvals=1;
-	if(integrity_initialized == 0)
-	{
-		dbc_sql_prepare(dbc, INTEGRITY_1, N_INTEGRITY_1);
-		integrity_initialized = 1;
-	}
-	rc=integrity(dbc, data, vals, nvals);
+static int integrity(db_context_t *dbc, struct integrity_t *data, char ** vals, int nvals);
 
-	if (rc == -1 )
+int
+extended_initialize_integrity(db_context_t *dbc)
+{
+	void *stmt = dbc_sql_prepare(dbc, INTEGRITY_1, N_INTEGRITY_1);
+	if (!stmt)
+		return ERROR;
+
+	dbc->transaction_data[INTEGRITY] = stmt;
+
+	return OK;
+}
+
+int
+extended_execute_integrity(db_context_t *dbc, struct integrity_t *data)
+{
+	char *vals[1];
+	int nvals=1;
+
+	if (integrity(dbc, data, vals, nvals) == -1)
 	{
 		LOG_ERROR_MESSAGE("TEST FINISHED WITH ERRORS \n");
 
@@ -37,6 +43,7 @@ int extended_execute_integrity(struct db_context_t *dbc, struct integrity_t *dat
 static int
 integrity(struct db_context_t *dbc, struct integrity_t *data, char ** vals, int nvals)
 {
+	void *stmt = dbc->transaction_data[INTEGRITY];
 	/* Input variables. */
 	int w_id = data->w_id;
 
@@ -48,7 +55,7 @@ integrity(struct db_context_t *dbc, struct integrity_t *data, char ** vals, int 
 #ifdef DEBUG_QUERY
 	LOG_ERROR_MESSAGE("%s query: %s\n", N_INTEGRITY_1, INTEGRITY_1);
 #endif
-	if (dbc_sql_execute_prepared(dbc, NULL, 0, &result, N_INTEGRITY_1) && result.result_set)
+	if (dbc_sql_execute_prepared(dbc, NULL, 0, &result, stmt) && result.result_set)
 	{
 		dbc_sql_fetchrow(dbc, &result);
 		vals[W_ID] = dbc_sql_getvalue(dbc, &result, 0); //W_ID

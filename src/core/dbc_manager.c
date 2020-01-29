@@ -157,7 +157,7 @@ int dbc_manager_is_extended_supported()
 }
 
 /* interfaces */
-struct db_context_t *
+db_context_t *
 dbc_db_init(void)
 {
 	assert(_dbc_info);
@@ -165,7 +165,7 @@ dbc_db_init(void)
 	return (*(sop->db_init))();
 }
 int
-dbc_connect_to_db(struct db_context_t *dbc)
+dbc_connect_to_db(db_context_t *dbc)
 {
 	assert(_dbc_info);
 	struct dbc_sql_operation_t *sop = _dbc_info->dbc_sql_operation;
@@ -173,7 +173,7 @@ dbc_connect_to_db(struct db_context_t *dbc)
 }
 
 int
-dbc_disconnect_from_db(struct db_context_t *dbc)
+dbc_disconnect_from_db(db_context_t *dbc)
 {
 	assert(_dbc_info);
 	struct dbc_sql_operation_t *sop = _dbc_info->dbc_sql_operation;
@@ -181,7 +181,7 @@ dbc_disconnect_from_db(struct db_context_t *dbc)
 }
 
 int
-dbc_commit_transaction(struct db_context_t *dbc)
+dbc_commit_transaction(db_context_t *dbc)
 {
 	assert(_dbc_info);
 	struct dbc_sql_operation_t *sop = _dbc_info->dbc_sql_operation;
@@ -189,7 +189,7 @@ dbc_commit_transaction(struct db_context_t *dbc)
 }
 
 int
-dbc_rollback_transaction(struct db_context_t *dbc)
+dbc_rollback_transaction(db_context_t *dbc)
 {
 	assert(_dbc_info);
 	struct dbc_sql_operation_t *sop = _dbc_info->dbc_sql_operation;
@@ -208,7 +208,7 @@ dbc_rollback_transaction(struct db_context_t *dbc)
  * if execute failed, memory should release in this function.
  */
 int
-dbc_sql_execute(struct db_context_t *dbc, char * query, struct sql_result_t * sql_result,
+dbc_sql_execute(db_context_t *dbc, char * query, struct sql_result_t * sql_result,
                        char * query_name)
 {
 	assert(_dbc_info);
@@ -216,8 +216,8 @@ dbc_sql_execute(struct db_context_t *dbc, char * query, struct sql_result_t * sq
 	return (*(sop->sql_execute))(dbc, query, sql_result, query_name);
 }
 
-int
-dbc_sql_prepare(struct db_context_t *dbc,  char *query, char *query_name)
+void *
+dbc_sql_prepare(db_context_t *dbc,  char *query, void *query_name)
 {
 	assert(_dbc_info);
 	struct dbc_sql_operation_t *sop = _dbc_info->dbc_sql_operation;
@@ -226,17 +226,17 @@ dbc_sql_prepare(struct db_context_t *dbc,  char *query, char *query_name)
 
 int
 dbc_sql_execute_prepared(
-	struct db_context_t *dbc,
-	char **params, int num_params, struct sql_result_t * sql_result,
-	char * query_name)
+	db_context_t *dbc,
+	char **params, int num_params, struct sql_result_t *sql_result,
+	void *query_stmt)
 {
 	assert(_dbc_info);
 	struct dbc_sql_operation_t *sop = _dbc_info->dbc_sql_operation;
-	return (*(sop->sql_execute_prepared))(dbc, params, num_params, sql_result, query_name);
+	return (*(sop->sql_execute_prepared))(dbc, params, num_params, sql_result, query_stmt);
 }
 
 int
-dbc_sql_fetchrow(struct db_context_t *dbc, struct sql_result_t * sql_result)
+dbc_sql_fetchrow(db_context_t *dbc, struct sql_result_t * sql_result)
 {
 	assert(_dbc_info);
 	struct dbc_sql_operation_t *sop = _dbc_info->dbc_sql_operation;
@@ -244,7 +244,7 @@ dbc_sql_fetchrow(struct db_context_t *dbc, struct sql_result_t * sql_result)
 }
 
 int
-dbc_sql_close_cursor(struct db_context_t *dbc, struct sql_result_t * sql_result)
+dbc_sql_close_cursor(db_context_t *dbc, struct sql_result_t * sql_result)
 {
 	assert(_dbc_info);
 	struct dbc_sql_operation_t *sop = _dbc_info->dbc_sql_operation;
@@ -252,7 +252,7 @@ dbc_sql_close_cursor(struct db_context_t *dbc, struct sql_result_t * sql_result)
 }
 
 char *
-dbc_sql_getvalue(struct db_context_t *dbc, struct sql_result_t * sql_result, int field)
+dbc_sql_getvalue(db_context_t *dbc, struct sql_result_t * sql_result, int field)
 {
 	assert(_dbc_info);
 	struct dbc_sql_operation_t *sop = _dbc_info->dbc_sql_operation;
@@ -260,7 +260,7 @@ dbc_sql_getvalue(struct db_context_t *dbc, struct sql_result_t * sql_result, int
 }
 
 /* storeproc */
-int dbc_execsp_integrity (struct db_context_t *dbc, struct integrity_t *data)
+int dbc_execsp_integrity (db_context_t *dbc, struct integrity_t *data)
 {
 	assert(_dbc_info);
 	struct dbc_storeproc_operation_t *sop = _dbc_info->dbc_storeproc_operation;
@@ -268,7 +268,7 @@ int dbc_execsp_integrity (struct db_context_t *dbc, struct integrity_t *data)
 	return (*(sop->exec_sp_integrity))(dbc, data);
 }
 
-int dbc_execsp_delivery (struct db_context_t *dbc, struct delivery_t *data)
+int dbc_execsp_delivery (db_context_t *dbc, struct delivery_t *data)
 {
 	assert(_dbc_info);
 	struct dbc_storeproc_operation_t *sop = _dbc_info->dbc_storeproc_operation;
@@ -276,7 +276,7 @@ int dbc_execsp_delivery (struct db_context_t *dbc, struct delivery_t *data)
 	return (*(sop->exec_sp_delivery))(dbc, data);
 }
 
-int dbc_execsp_new_order (struct db_context_t *dbc, struct new_order_t *data)
+int dbc_execsp_new_order (db_context_t *dbc, struct new_order_t *data)
 {
 	assert(_dbc_info);
 	struct dbc_storeproc_operation_t *sop = _dbc_info->dbc_storeproc_operation;
@@ -284,7 +284,7 @@ int dbc_execsp_new_order (struct db_context_t *dbc, struct new_order_t *data)
 	return (*(sop->exec_sp_new_order))(dbc, data);
 }
 
-int dbc_execsp_order_status (struct db_context_t *dbc, struct order_status_t *data)
+int dbc_execsp_order_status (db_context_t *dbc, struct order_status_t *data)
 {
 	assert(_dbc_info);
 	struct dbc_storeproc_operation_t *sop = _dbc_info->dbc_storeproc_operation;
@@ -292,7 +292,7 @@ int dbc_execsp_order_status (struct db_context_t *dbc, struct order_status_t *da
 	return (*(sop->exec_sp_order_status))(dbc, data);
 }
 
-int dbc_execsp_payment (struct db_context_t *dbc, struct payment_t *data)
+int dbc_execsp_payment (db_context_t *dbc, struct payment_t *data)
 {
 	assert(_dbc_info);
 	struct dbc_storeproc_operation_t *sop = _dbc_info->dbc_storeproc_operation;
@@ -300,7 +300,7 @@ int dbc_execsp_payment (struct db_context_t *dbc, struct payment_t *data)
 	return (*(sop->exec_sp_payment))(dbc, data);
 }
 
-int dbc_execsp_stock_level (struct db_context_t *dbc, struct stock_level_t *data)
+int dbc_execsp_stock_level (db_context_t *dbc, struct stock_level_t *data)
 {
 	assert(_dbc_info);
 	struct dbc_storeproc_operation_t *sop = _dbc_info->dbc_storeproc_operation;
@@ -308,7 +308,7 @@ int dbc_execsp_stock_level (struct db_context_t *dbc, struct stock_level_t *data
 	return (*(sop->exec_sp_stock_level))(dbc, data);
 }
 
-struct loader_stream_t *dbc_open_loader_stream(struct db_context_t *dbc,
+struct loader_stream_t *dbc_open_loader_stream(db_context_t *dbc,
 											   const char *table_name, char delimiter, char *null_str)
 {
   assert(_dbc_info);
@@ -337,6 +337,7 @@ void dbc_close_loader_stream(struct loader_stream_t *stream)
 
 struct sqlapi_operation_t storeproc_sqlapi_operation =
 {
+	{NULL},
 	dbc_execsp_integrity,
 	dbc_execsp_delivery,
 	dbc_execsp_new_order,
