@@ -71,7 +71,8 @@ int dbt2_init_params(char **values, int max_values, int max_length)
 
 void dbt2_free_params(char **values, int num_val)
 {
-	for(int i = 0; i < num_val; i++)
+	int i;
+	for(i = 0; i < num_val; i++)
 		free(values[i]);
 }
 

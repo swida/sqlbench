@@ -310,12 +310,13 @@ void start_drivers()
 
 void wait_drivers_finish()
 {
+	int i;
 	/* Note that the driver has started up all threads in the log. */
 	log_testing_start();
 	printf("steady status started...\n");
 
 	/* wait until all threads quit */
-	for (int i = 0; i < started_driver_count; i++) {
+	for (i = 0; i < started_driver_count; i++) {
 		if (pthread_join(driver_tids[i], NULL) != 0) {
 			LOG_ERROR_MESSAGE("error join terminal thread");
 		}

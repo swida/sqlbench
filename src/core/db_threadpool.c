@@ -319,6 +319,7 @@ int db_threadpool_init()
 void db_threadpool_destroy()
 {
 	int count;
+	int i;
 	if (no_thinktime != 0) {
 		time_t rampup_time = start_time + duration_rampup;
 
@@ -345,7 +346,7 @@ void db_threadpool_destroy()
 		sem_getvalue(&db_worker_count, &count);
 	}
 
-	for(int i = 0; i < db_worker_started; i++) {
+	for(i = 0; i < db_worker_started; i++) {
 		pthread_join(db_worker_tids[i], NULL);
 	}
 }

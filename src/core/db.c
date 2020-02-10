@@ -72,7 +72,8 @@ int
 initialize_transactions(db_context_t *dbc)
 {
 	int rc = OK;
-	for(int i = 0; i < N_TRANSACTIONS; i++) {
+	int i;
+	for(i = 0; i < N_TRANSACTIONS; i++) {
 		trx_initializer_t trx_init = sbo->trx_initialize[i];
 		if (trx_init && trx_init(dbc) != OK)
 			rc = ERROR;
@@ -134,7 +135,8 @@ int process_transaction(int transaction, db_context_t *dbc,
 void
 destroy_transactions(db_context_t *dbc)
 {
-	for(int i = 0; i < N_TRANSACTIONS; i++) {
+	int i;
+	for(i = 0; i < N_TRANSACTIONS; i++) {
 		trx_destroy_t trx_destroy = sbo->trx_destroy[i];
 		if (trx_destroy)
 			trx_destroy(dbc);
